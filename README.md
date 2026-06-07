@@ -1,35 +1,46 @@
-# IIT Madras Offline Navigation PWA
+# 🗺️ Navv
 
-A high-performance, mobile-optimized, offline-first navigation application for the IIT Madras campus.
+**Navv** is a high-performance, mobile-optimized, offline-first navigation Progressive Web App (PWA) designed for campus environments. It delivers a modern, seamless navigation experience entirely within the browser, requiring no external backends or native app downloads.
+
+---
 
 ## 🚀 Key Features
 
-- **Offline-First:** All rendering, searching, and routing works 100% offline once the initial campus data and map tiles are cached.
-- **Dynamic OSM Fetching:** Uses the Overpass API to pull the latest buildings, walkable paths, and amenities directly from OpenStreetMap.
-- **Intelligent Routing:** Features a custom Dijkstra pathfinding engine with "Virtual Building Nodes" to find the most optimal entrance for complex buildings.
-- **Turn-by-Turn Guidance:** Includes movement-based bearing calculation, turn smoothing (ignoring minor road curves), and "Wrong Way" detection.
-- **Modern UI:** Responsive, Google Maps inspired interface with fuzzy alphanumeric search and a live compass FOV indicator.
-- **Strict Geofencing:** Locked map viewport and GPS validation to keep the experience focused strictly on the IIT Madras campus.
+*   📶 **Offline-First Excellence:** Once the initial cache is complete, all rendering, searching, and routing logic works 100% offline.
+*   🧭 **Smart Turn-by-Turn Guidance:** Includes movement-based bearing calculation, turn smoothing (ignoring minor road curves), and active "Wrong Way" detection.
+*   ✨ **Modern Indigo Design System:** A clean, mobile-first interface featuring standardized glassmorphism, responsive panels, and a polished indigo brand palette.
+*   🔍 **Intelligent Search:** Fuzzy alphanumeric search that handles abbreviations and aliases, making POI discovery instant and reliable.
+*   🛡️ **Strict Geofencing:** Keeps the experience focused and reliable with locked map viewports and GPS boundary validation.
+*   📈 **Dynamic Data Sync:** Uses the Overpass API to pull the latest buildings and walkable paths directly from OpenStreetMap, with background updates every 3 months.
+
+---
 
 ## 🏗️ Architecture
 
-The app follows a strict **Two-File Architecture**:
-- `index.html`: Contains all application logic, styles, and the client-side data engine.
-- `sw.js`: A robust Service Worker that handles asset caching and automated map tile pre-caching.
+Navv is built on a strict **Two-File Philosophy** to ensure maximum performance and maintainability:
 
-## 🛠️ Data Management
-
-- **Storage:** Uses IndexedDB to cache the processed routing graph and POI catalog.
-- **Refresh:** Automatically updates campus data in the background every 3 months when an internet connection is available.
-- **Tiles:** Synchronizes visual map tiles with routing data updates.
-
-## 📱 Mobile Setup
-
-For the best experience:
-1. Open the URL in your mobile browser.
-2. Select "Add to Home Screen" to install it as a PWA.
-3. Allow location access when prompted.
-4. Wait for the "Caching map..." progress bar to finish for full offline reliability.
+1.  **`index.html`**: The entire application shell. It contains the UI (Modern Indigo CSS), the client-side data engine, the routing logic (Custom Dijkstra), and map initialization.
+2.  **`sw.js`**: A robust Service Worker responsible for aggressive asset caching and automated, rate-limited map tile pre-caching for full offline reliability.
 
 ---
+
+## 🛠️ Data & Performance
+
+*   **Caching:** Uses **IndexedDB** for high-speed local storage of processed routing graphs and POI catalogs.
+*   **Tile Management:** Automatically manages and synchronizes visual map tiles with the underlying routing data.
+*   **Performance:** Optimized for low-power mobile devices with efficient graph traversal and minimal DOM overhead.
+
+---
+
+## 📱 Getting Started (Mobile)
+
+For the best experience on your phone:
+
+1.  **Open:** Load the Navv URL in your mobile browser.
+2.  **Install:** Select **"Add to Home Screen"** to install it as a standalone PWA.
+3.  **Authorize:** Allow location access when prompted to enable live GPS tracking.
+4.  **Sync:** Wait for the **"Caching Navv..."** progress bar to finish. This ensures full map functionality even in dead zones.
+
+---
+
 *Built with Leaflet.js, OpenStreetMap, and Overpass API.*

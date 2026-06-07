@@ -1,9 +1,9 @@
 // ─── CACHE VERSIONING ────────────────────────────────────────────────────────
-const CACHE_NAME = 'navmap-v6';
-const TILES_CACHE = 'navmap-tiles-v3';
+const CACHE_NAME = 'navv-cache-v1';
+const TILES_CACHE = 'navv-tiles-v1';
 
 // ─── CAMPUS BOUNDING BOX ─────────────────────────────────────────────────────
-// IIT Madras campus with a small buffer
+// Campus bounding box with a small buffer
 const BOUNDS = { S: 12.978, N: 13.008, W: 80.220, E: 80.248 };
 // Zoom 14-17: good quality, manageable tile count (~900 tiles)
 const TILE_ZOOM_MIN = 13;
@@ -47,10 +47,10 @@ function getAllCampusTileUrls() {
 
 // ─── INSTALL: Cache app shell immediately, tiles deferred ────────────────────
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v6…');
+  console.log('[SW] Installing Navv Cache…');
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      console.log('[SW] Caching app shell');
+      console.log('[SW] Caching Navv app shell');
       return cache.addAll(ASSETS_TO_CACHE);
     }).then(() => {
       console.log('[SW] App shell cached, skipping waiting');
@@ -86,7 +86,7 @@ async function cacheCampusTiles() {
             return;
           }
           const resp = await fetch(url, {
-            headers: { 'User-Agent': 'IITMNavMap/1.0' },
+            headers: { 'User-Agent': 'Navv/1.0' },
             cache: 'no-store'
           });
           if (resp.ok) {
@@ -117,7 +117,7 @@ async function cacheCampusTiles() {
 
 // ─── ACTIVATE: Clean up old caches ───────────────────────────────────────────
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating v6…');
+  console.log('[SW] Activating Navv Cache…');
   event.waitUntil(
     caches.keys().then(cacheNames =>
       Promise.all(

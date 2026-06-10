@@ -946,8 +946,8 @@ out geom;`;
                 if (userLocation) map.flyTo(userLocation, 18);
                 if (!orientListening) {
                     orientListening = true;
-                    // Try absolute orientation first, fall back to relative
                     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        // iOS: request permission first
                         DeviceOrientationEvent.requestPermission().then(s => {
                             if (s === 'granted') {
                                 window.addEventListener('deviceorientationabsolute', onOrient, true);
@@ -955,6 +955,7 @@ out geom;`;
                             }
                         });
                     } else {
+                        // Android / Desktop: listen to both; absolute fires first and sets the flag
                         window.addEventListener('deviceorientationabsolute', onOrient, true);
                         window.addEventListener('deviceorientation', onOrient, true);
                     }
@@ -962,20 +963,23 @@ out geom;`;
             };
         }
 
+        let _hasAbsoluteCompass = false; // true once a real compass heading has been received
         function onOrient(e) {
             let h = null;
-            // Priority 1: webkitCompassHeading (iOS — already true North, no math needed)
+            // Priority 1: webkitCompassHeading (iOS — true North, most reliable)
             if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
                 h = e.webkitCompassHeading;
-            // Priority 2: absolute event alpha (Android absolute)
-            } else if (e.absolute && e.alpha !== null) {
+                _hasAbsoluteCompass = true;
+            // Priority 2: absolute deviceorientation alpha (Android with magnetometer)
+            } else if (e.absolute === true && e.alpha !== null) {
                 h = (360 - e.alpha) % 360;
-            // Priority 3: relative deviceorientation (fallback — may drift)
-            } else if (!e.absolute && e.alpha !== null) {
+                _hasAbsoluteCompass = true;
+            // Priority 3: relative deviceorientation — only use if we never got an absolute fix
+            } else if (!_hasAbsoluteCompass && e.alpha !== null) {
                 h = (360 - e.alpha) % 360;
             }
             if (h !== null) {
-                userHeading = h; // Keep userHeading in sync with compass
+                userHeading = h;
                 const el = document.getElementById('user-arrow');
                 if (el) { el.style.transform = `rotate(${h}deg)`; el.style.display = 'block'; }
             }

@@ -637,13 +637,13 @@ out geom;`;
             blueDotIcon = L.divIcon({ 
                 className: 'user-dot', 
                 html: `
-                    <div style="position:relative; width:40px; height:40px;">
-                        <div id="user-arrow" style="position:absolute; top:50%; left:50%; width:24px; height:24px; margin-left:-12px; margin-top:-12px; transform-origin: 50% 50%; transition: transform 0.4s ease; display:none; z-index:0;">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--primary)" opacity="0.9">
-                                <path d="M12 2L22 22L12 17L2 22Z"/>
+                    <div style="position:relative; width:40px; height:40px; overflow:visible;">
+                        <div id="user-arrow" style="position:absolute; top:50%; left:50%; width:22px; height:26px; margin-left:-11px; margin-top:-26px; transform-origin: 50% 100%; transition: transform 0.25s ease-out; display:none; z-index:2;">
+                            <svg width="22" height="26" viewBox="0 0 22 26" fill="none">
+                                <path d="M11 0L22 26L11 19L0 26Z" fill="#4F46E5" stroke="white" stroke-width="2" stroke-linejoin="round"/>
                             </svg>
                         </div>
-                        <div style="position:absolute; top:50%; left:50%; width:14px; height:14px; margin-left:-10px; margin-top:-10px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79,70,229,0.3); z-index:1; box-sizing: content-box;"></div>
+                        <div style="position:absolute; top:50%; left:50%; width:14px; height:14px; margin-left:-10px; margin-top:-10px; background:#4F46E5; border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79,70,229,0.3); z-index:1; box-sizing: content-box;"></div>
                     </div>`, 
                 iconSize: [40, 40], 
                 iconAnchor: [20, 20] 

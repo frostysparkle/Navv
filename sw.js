@@ -144,11 +144,11 @@ self.addEventListener('message', event => {
   }
 });
 
-// ─── FETCH: Cache-first for tiles, stale-while-revalidate for app ─────────────
+// ─── FETCH: Multi-strategy caching ───────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // OSM tiles → cache-first
+  // 1. OSM tiles → Cache-First
   if (url.hostname.endsWith('tile.openstreetmap.org')) {
     event.respondWith(
       caches.match(event.request).then(cached => {
@@ -164,7 +164,24 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // App shell → cache-first with network fallback
+  // 2. App shell (index.html, root) → Network-First
+  // This ensures users always get the latest version if online.
+  if (url.hostname === self.location.hostname && (url.pathname === '/' || url.pathname.endsWith('index.html'))) {
+    event.respondWith(
+      fetch(event.request).then(resp => {
+        if (resp.ok) {
+          const clone = resp.clone();
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        }
+        return resp;
+      }).catch(() => {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+
+  // 3. Static Assets (CDNs, shared libs) → Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then(cached => {
       const networkFetch = fetch(event.request).then(resp => {

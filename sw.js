@@ -178,8 +178,9 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 2. App shell (HTML navigation, Manifest) → Network-First
-  if (event.request.mode === 'navigate' || url.pathname.endsWith('manifest.json')) {
+  // 2. App shell (HTML, local JS/CSS, Manifest) → Network-First
+  const isLocalAsset = url.origin === location.origin && (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html'));
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('manifest.json') || isLocalAsset) {
     event.respondWith(
       fetch(event.request.url, { cache: 'no-cache' }).then(resp => {
         if (resp.ok) {
@@ -188,9 +189,9 @@ self.addEventListener('fetch', event => {
         }
         return resp;
       }).catch(() => {
-        // If navigation fails (offline), try index.html specifically
+        // If network fails (offline), fallback to cache
         return caches.match(event.request).then(match => {
-          return match || caches.match('./index.html');
+          return match || (event.request.mode === 'navigate' ? caches.match('./index.html') : null);
         });
       })
     );

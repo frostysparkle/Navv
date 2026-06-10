@@ -40,6 +40,11 @@
         });
       }
     </script>
+    <script>
+        // Prevent FOUC for dark theme
+        const t = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        if (t === 'dark') document.documentElement.classList.add('dark-theme');
+    </script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -59,7 +64,7 @@
             --safe-bottom: env(safe-area-inset-bottom, 20px);
         }
 
-        body.dark-theme {
+        html.dark-theme body, body.dark-theme {
             --bg-glass: rgba(24, 24, 27, 0.85);
             --bg-solid: #121214;
             --text-main: #F9FAFB;
@@ -69,7 +74,7 @@
         }
 
         /* True Dark Map Filter */
-        body.dark-theme .leaflet-tile-pane {
+        html.dark-theme .leaflet-tile-pane, body.dark-theme .leaflet-tile-pane {
             filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
         }
 
@@ -217,11 +222,15 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.5s ease;
         }
+        .loading-title { font-size: 24px; font-weight: 800; color: var(--primary); margin-top: 16px; margin-bottom: 8px; }
+        .loading-subtitle { font-size: 14px; font-weight: 500; color: var(--text-muted); }
     </style>
 </head>
 <body class="light-theme">
     <div id="loading">
         <div style="width:40px; height:40px; border:4px solid var(--border); border-top-color:var(--primary); border-radius:50%;" class="spinning"></div>
+        <div class="loading-title">Navv</div>
+        <div class="loading-subtitle" id="loading-text">Loading campus map...</div>
     </div>
 
     <div id="map"></div>
@@ -275,14 +284,20 @@
         <h2 id="route-dest-name" style="font-size:22px; font-weight:800; margin:0;">Destination</h2>
         <p id="route-distance" style="color:var(--text-muted); font-weight:600; font-size:14px; margin:4px 0 0 0;">Calculating...</p>
         <div class="btn-row">
-            <button id="alt-route-btn" class="main-btn" style="background:var(--primary); color:white;">Alternate</button>
-            <button id="cancel-route-btn" class="main-btn" style="background:rgba(128,128,128,0.1); color:var(--text-main);">End</button>
+            <button id="alt-route-btn" class="main-btn" style="background:var(--primary); color:white; display:flex; justify-content:center; align-items:center; gap:8px;">
+                <span>Alternate</span>
+                <div id="alt-spinner" class="spinning" style="display:none; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%;"></div>
+            </button>
+            <button id="cancel-route-btn" class="main-btn" style="background:rgba(128,128,128,0.1); color:var(--text-main);">Cancel</button>
+        </div>
+        <div style="text-align:center; margin-top:16px;">
+            <a id="maps-redirect-btn" href="#" target="_blank" style="color:var(--primary); font-size:13px; font-weight:600; text-decoration:none; display:none; padding:8px;">📍 Open in Maps</a>
         </div>
     </div>
 
     <script>
         let campusData = null;
-        let map, userMarker, userLocation, watchId, currentHeading, currentDestination, currentDestinationName, destinationMarker, currentRoutePolyline, currentRoutePath = [], currentPathIds = [], isFollowing = false, toastTimeout, campusBounds, userHeading = null, lastLoc = null, firstPos = true;
+        let map, userMarker, userLocation, watchId, currentHeading, currentDestination, currentDestinationName, destinationMarker, currentRoutePolyline, currentRoutePath = [], currentPathIds = [], isFollowing = false, toastTimeout, campusBounds, userHeading = null, lastLoc = null, firstPos = true, currentRouteProgress = 0, lastGpsTime = 0;
         let blockedNodeIds = new Set();
         let isCalculatingRoute = false;
         let blueDotIcon; // Assigned inside initMap() once Leaflet (L) is confirmed loaded
@@ -294,13 +309,18 @@
             const sunIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
             const moonIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
             
+            const doc = document.documentElement;
             if (theme === 'dark') {
                 body.classList.add('dark-theme');
                 body.classList.remove('light-theme');
+                doc.classList.add('dark-theme');
+                doc.classList.remove('light-theme');
                 toggle.innerHTML = sunIcon;
             } else {
                 body.classList.add('light-theme');
                 body.classList.remove('dark-theme');
+                doc.classList.add('light-theme');
+                doc.classList.remove('dark-theme');
                 toggle.innerHTML = moonIcon;
             }
             localStorage.setItem('theme', theme);
@@ -364,7 +384,8 @@
         }
 
         // IndexedDB logic remains same
-        const DB_NAME = 'Navv_Map_DB', DB_VERSION = 4, STORE_NAME = 'campusData';
+        const DB_NAME = 'Navv_Map_DB', DB_VERSION = 6, STORE_NAME = 'campusData';
+        let cachedIdfMap = null, cachedAvgDocLen = 0, idfComputed = false;
         async function initDB() { return new Promise((res, rej) => { const req = indexedDB.open(DB_NAME, DB_VERSION); req.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME); }; req.onsuccess = (e) => res(e.target.result); req.onerror = (e) => rej(e.target.error); }); }
         async function getCachedData() { const db = await initDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readonly'); const store = tx.objectStore(STORE_NAME); const req = store.get('navv_data'); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
         async function saveToCache(data) { const db = await initDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); const req = store.put({ data, timestamp: Date.now() }, 'navv_data'); req.onsuccess = () => res(); req.onerror = () => rej(req.error); }); }
@@ -442,7 +463,12 @@ out geom;`;
                             if (!data.graph.nodes[nid]) data.graph.nodes[nid] = coords;
                             if (i > 0) {
                                 const prevNid = el.nodes[i - 1], prevCoords = el.geometry ? [el.geometry[i-1].lon, el.geometry[i-1].lat] : (allNodes[prevNid] ? [allNodes[prevNid][1], allNodes[prevNid][0]] : null);
-                                if (prevCoords) { const dist = getDistance(coords[1], coords[0], prevCoords[1], prevCoords[0]); if (!data.graph.edges[nid]) data.graph.edges[nid] = {}; if (!data.graph.edges[prevNid]) data.graph.edges[prevNid] = {}; data.graph.edges[nid][prevNid] = dist; data.graph.edges[prevNid][nid] = dist; }
+                                if (prevCoords) { 
+                                    const WALK_COST = { footway:1, path:1, pedestrian:1, steps:1, cycleway:1.2, living_street:1.3, track:1.5, residential:2.5, unclassified:2, service:3.5, tertiary:6, secondary:7, primary:8 };
+                                    const walkCost = WALK_COST[tags.highway] !== undefined ? WALK_COST[tags.highway] : 1.5;
+                                    const dist = getDistance(coords[1], coords[0], prevCoords[1], prevCoords[0]) * walkCost; 
+                                    if (!data.graph.edges[nid]) data.graph.edges[nid] = {}; if (!data.graph.edges[prevNid]) data.graph.edges[prevNid] = {}; data.graph.edges[nid][prevNid] = dist; data.graph.edges[prevNid][nid] = dist; 
+                                }
                             }
                         }
                     }
@@ -462,12 +488,27 @@ out geom;`;
             data.buildings.forEach(b => {
                 const bNodeId = `b_${b.id}`; data.graph.nodes[bNodeId] = [b.lon, b.lat];
                 if (!data.graph.edges[bNodeId]) data.graph.edges[bNodeId] = {};
-                let connected = false;
-                if (b.nodes) b.nodes.forEach(nid => { if (data.graph.nodes[nid]) { data.graph.edges[bNodeId][nid] = 0; if (!data.graph.edges[nid]) data.graph.edges[nid] = {}; data.graph.edges[nid][bNodeId] = 0; connected = true; } });
-                if (!connected) {
-                    let nearestId = null, minDist = Infinity;
-                    for (const [nid, coords] of Object.entries(data.graph.nodes)) { if (nid.startsWith('b_')) continue; const d = getDistance(b.lat, b.lon, coords[1], coords[0]); if (d < minDist) { minDist = d; nearestId = nid; } }
-                    if (nearestId) { data.graph.edges[bNodeId][nearestId] = 0; if (!data.graph.edges[nearestId]) data.graph.edges[nearestId] = {}; data.graph.edges[nearestId][bNodeId] = 0; }
+                
+                let nearestId = null, minDist = Infinity;
+                if (b.nodes) {
+                    b.nodes.forEach(nid => {
+                        if (data.graph.nodes[nid] && !nid.startsWith('b_')) {
+                            const d = getDistance(b.lat, b.lon, data.graph.nodes[nid][1], data.graph.nodes[nid][0]);
+                            if (d < minDist) { minDist = d; nearestId = nid; }
+                        }
+                    });
+                }
+                if (!nearestId) {
+                    for (const [nid, coords] of Object.entries(data.graph.nodes)) {
+                        if (nid.startsWith('b_')) continue;
+                        const d = getDistance(b.lat, b.lon, coords[1], coords[0]);
+                        if (d < minDist) { minDist = d; nearestId = nid; }
+                    }
+                }
+                if (nearestId) {
+                    data.graph.edges[bNodeId][nearestId] = minDist;
+                    if (!data.graph.edges[nearestId]) data.graph.edges[nearestId] = {};
+                    data.graph.edges[nearestId][bNodeId] = minDist;
                 }
             });
             return data;
@@ -507,8 +548,10 @@ out geom;`;
                             campusData = cached.data;
                             showToast('Using cached map data');
                         } else {
-                            dismissLoadingSpinner();
-                            alert('Could not load map data. Please check your internet connection and reload.');
+                            const loadingText = document.getElementById('loading-text');
+                            if (loadingText) loadingText.innerHTML = '<span style="color:var(--danger)">Failed to load map data. Please check connection and reload.</span>';
+                            const spinner = document.querySelector('.spinning');
+                            if (spinner) spinner.style.display = 'none';
                             return;
                         }
                     }
@@ -516,8 +559,10 @@ out geom;`;
                 initMap();
             } catch (err) {
                 console.error('[Navv] loadApp error:', err);
-                dismissLoadingSpinner();
-                alert('Failed to start app. Please reload.');
+                const loadingText = document.getElementById('loading-text');
+                if (loadingText) loadingText.innerHTML = '<span style="color:var(--danger)">Failed to start app. Please reload.</span>';
+                const spinner = document.querySelector('.spinning');
+                if (spinner) spinner.style.display = 'none';
             }
         }
 
@@ -644,19 +689,23 @@ out geom;`;
                 const qTokens = tokenise(q);
                 // Also treat the raw stripped query as a possible initialism
                 const qRaw = q.replace(/\s+/g, '');
-                const looksLikeInitialism = /^[a-z]{2,6}$/.test(qRaw) && qTokens.length === 1;
 
-                // Compute IDF across the corpus
-                const N = buildings.length;
-                const df = new Map();
-                for (const b of buildings) {
-                    const seen = new Set(b._tokens);
-                    for (const t of seen) df.set(t, (df.get(t) || 0) + 1);
+                // Compute IDF across the corpus ONCE
+                if (!idfComputed) {
+                    const N = buildings.length;
+                    const df = new Map();
+                    for (const b of buildings) {
+                        const seen = new Set(b._tokens);
+                        for (const t of seen) df.set(t, (df.get(t) || 0) + 1);
+                    }
+                    cachedIdfMap = new Map();
+                    for (const [t, d] of df) cachedIdfMap.set(t, Math.log((N - d + 0.5) / (d + 0.5) + 1));
+                    cachedAvgDocLen = buildings.reduce((s, b) => s + b._docLen, 0) / N;
+                    idfComputed = true;
                 }
-                const idfMap = new Map();
-                for (const [t, d] of df) idfMap.set(t, Math.log((N - d + 0.5) / (d + 0.5) + 1));
-
-                const avgDocLen = buildings.reduce((s, b) => s + b._docLen, 0) / N;
+                const N = buildings.length;
+                const idfMap = cachedIdfMap;
+                const avgDocLen = cachedAvgDocLen;
 
                 // Score every building
                 const scored = buildings.map(b => {
@@ -708,26 +757,46 @@ out geom;`;
                         };
                         results.appendChild(div);
                     });
-                } else { results.innerHTML = '<div style="padding:20px; text-align:center;" class="text-muted">No results found</div>'; }
+                } else { results.style.display = 'none'; }
             });
 
             map.on('click', () => { results.style.display = 'none'; searchInput.blur(); document.body.classList.remove('search-active'); });
 
             document.getElementById('alt-route-btn').onclick = async () => {
                 if (isCalculatingRoute) return;
+                if (!userLocation) { showToast("Awaiting GPS..."); return; }
                 if (currentPathIds.length < 2) { showToast("No alternate available"); return; }
                 isCalculatingRoute = true;
-                const nodeToBlock = currentPathIds[1];
-                if (typeof nodeToBlock === 'string' && nodeToBlock.startsWith('b_')) { showToast("Almost there!"); isCalculatingRoute = false; return; }
+                document.getElementById('alt-spinner').style.display = 'block';
+                let nodeToBlock = null;
+                for (let i = currentRouteProgress; i < currentPathIds.length; i++) {
+                    const id = currentPathIds[i];
+                    if (typeof id === 'string' && id.startsWith('b_')) continue;
+                    nodeToBlock = id;
+                    break;
+                }
+                if (!nodeToBlock) {
+                    showToast("Almost there!"); isCalculatingRoute = false; document.getElementById('alt-spinner').style.display = 'none'; return;
+                }
                 blockedNodeIds.add(nodeToBlock);
+                await new Promise(r => setTimeout(r, 50)); // let spinner render
                 const hasAlt = await tryFindAlternate();
-                if (hasAlt) calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
-                else { blockedNodeIds.clear(); showToast("Resetting routes..."); calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName); }
+                if (hasAlt) {
+                    currentPathIds = [];
+                    calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                } else {
+                    const wasBlocked = blockedNodeIds.size > 1;
+                    blockedNodeIds.clear();
+                    showToast(wasBlocked ? "Resetting routes..." : "No alternate available");
+                    currentPathIds = [];
+                    calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                }
                 isCalculatingRoute = false;
+                document.getElementById('alt-spinner').style.display = 'none';
             };
 
             async function tryFindAlternate() {
-                const sNodes = getNearestNodes(userLocation[0], userLocation[1], 3), eNodes = getNearestNodes(currentDestination[0], currentDestination[1], 1);
+                const sNodes = getNearestNodes(userLocation[0], userLocation[1], 5), eNodes = getNearestNodes(currentDestination[0], currentDestination[1], 1);
                 for (const s of sNodes) for (const e of eNodes) if (dijkstra(s, e, blockedNodeIds)) return true;
                 return false;
             }
@@ -793,18 +862,25 @@ out geom;`;
                     if (currentRoutePath.length === 0) calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
                     else {
                         let minDist = Infinity;
+                        let minIdx = 0;
                         for (let i = 0; i < currentRoutePath.length - 1; i++) {
                             const d = getDistanceToSegment(lat, lon, currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
-                            if (d < minDist) minDist = d;
+                            if (d < minDist) { minDist = d; minIdx = i; }
                         }
-                        if (minDist > 15) calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
-                        else updateNavBanner(lat, lon);
+                        currentRouteProgress = minIdx;
+                        if (minDist > 15) {
+                            currentPathIds = [];
+                            calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                        } else {
+                            updateNavBanner(lat, lon);
+                        }
                     }
                 }
             };
             
-            const start = () => navigator.geolocation.watchPosition(handlePos, (e) => { if (e.code !== 3) showToast("GPS error"); }, { enableHighAccuracy: true, maximumAge: 0 });
+            const start = () => navigator.geolocation.watchPosition(handlePos, (e) => { if (e.code !== 3) showToast("GPS error: " + e.message); }, { enableHighAccuracy: true, maximumAge: 0 });
             watchId = start();
+            setTimeout(() => { if (!userLocation) showToast("Enable location for directions"); }, 10000);
             let orientListening = false; // Guard: prevent duplicate listeners on repeated GPS button taps
             gpsBtn.onclick = () => { 
                 isFollowing = true; updateGPSUI(); 
@@ -827,7 +903,7 @@ out geom;`;
         function dijkstra(startId, endId, blocked = new Set()) {
             const graph = campusData.graph.edges, dists = {}, prev = {}, pq = new PriorityQueue();
             for (const n in campusData.graph.nodes) { dists[n] = Infinity; prev[n] = null; }
-            if (!(startId in dists)) return null;
+            if (!(startId in dists) || blocked.has(startId) || blocked.has(endId)) return null;
             dists[startId] = 0; pq.enqueue(startId, 0);
             while (!pq.isEmpty()) {
                 const u = pq.dequeue(); if (u === endId) break;
@@ -839,8 +915,14 @@ out geom;`;
 
         function setDestination(latLng, name) {
             currentDestination = latLng; currentDestinationName = name; blockedNodeIds.clear();
+            currentPathIds = []; currentRouteProgress = 0;
             if (destinationMarker) map.removeLayer(destinationMarker);
             destinationMarker = L.marker(latLng, { icon: L.divIcon({ className: 'dest', html: '<div style="font-size:32px; transform:translate(-50%,-100%);">🎯</div>' }) }).addTo(map);
+            const redirectBtn = document.getElementById('maps-redirect-btn');
+            if (redirectBtn) {
+                redirectBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${latLng[0]},${latLng[1]}&travelmode=walking`;
+                redirectBtn.style.display = 'inline-block';
+            }
             map.flyTo(latLng, 17);
             if (userLocation) calculateAndDrawRoute(userLocation, latLng, name);
             else showToast("Awaiting GPS...");
@@ -848,10 +930,16 @@ out geom;`;
 
         function calculateAndDrawRoute(start, end, name) {
             if (currentRoutePolyline) map.removeLayer(currentRoutePolyline);
-            const sNodes = getNearestNodes(start[0], start[1], 5), eNodes = getNearestNodes(end[0], end[1], 1);
+            let sNodes = [];
+            if (currentPathIds.length > 0 && currentRouteProgress > 0) {
+                const forwardIds = currentPathIds.slice(currentRouteProgress, currentRouteProgress + 3);
+                if (forwardIds.length > 0) sNodes = forwardIds;
+            }
+            if (sNodes.length === 0) sNodes = getNearestNodes(start[0], start[1], 5);
+            const eNodes = getNearestNodes(end[0], end[1], 1);
             let pIds = null; for (const s of sNodes) { for (const e of eNodes) { pIds = dijkstra(s, e, blockedNodeIds); if (pIds) break; } if (pIds) break; }
             if (pIds) {
-                currentPathIds = pIds; const lls = pIds.map(id => [campusData.graph.nodes[id][1], campusData.graph.nodes[id][0]]);
+                currentPathIds = pIds; currentRouteProgress = 0; const lls = pIds.map(id => [campusData.graph.nodes[id][1], campusData.graph.nodes[id][0]]);
                 lls.unshift(start); lls.push(end); currentRoutePath = lls;
                 currentRoutePolyline = L.polyline(lls, { color: '#4F46E5', weight: 6, opacity: 0.9, dashArray: '12, 12', className: 'route-path-animated' }).addTo(map);
                 let d = 0; for (let i=0; i<lls.length-1; i++) d += getDistance(lls[i][0], lls[i][1], lls[i+1][0], lls[i+1][1]);
@@ -873,8 +961,37 @@ out geom;`;
             if (currentRoutePath.length < 2) return;
             const dest = currentRoutePath[currentRoutePath.length - 1], dToD = getDistance(lat, lon, dest[0], dest[1]);
             if (dToD < 15) { document.getElementById('nav-arrow').textContent = '🎯'; document.getElementById('nav-instruction').textContent = 'Arrived!'; document.getElementById('nav-banner').style.display = 'flex'; return; }
-            document.getElementById('nav-instruction').textContent = 'Follow path';
-            document.getElementById('nav-distance').textContent = Math.round(dToD) + 'm';
+            
+            let turnText = "Follow path", turnIcon = "⬆️", dToTurn = dToD;
+            
+            if (userHeading !== null && currentRouteProgress < currentRoutePath.length - 1) {
+                const segBear = getBearing(currentRoutePath[currentRouteProgress][0], currentRoutePath[currentRouteProgress][1], currentRoutePath[currentRouteProgress+1][0], currentRoutePath[currentRouteProgress+1][1]);
+                const diff = (segBear - userHeading + 360) % 360;
+                if (diff > 120 && diff < 240) {
+                    document.getElementById('nav-arrow').textContent = "↩️";
+                    document.getElementById('nav-instruction').textContent = "U-turn";
+                    document.getElementById('nav-distance').textContent = "Wrong way";
+                    document.getElementById('nav-banner').style.display = 'flex';
+                    return;
+                }
+            }
+
+            for (let i = currentRouteProgress + 1; i < currentRoutePath.length - 1; i++) {
+                const b1 = getBearing(currentRoutePath[i-1][0], currentRoutePath[i-1][1], currentRoutePath[i][0], currentRoutePath[i][1]);
+                const b2 = getBearing(currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
+                const diff = (b2 - b1 + 360) % 360;
+                if (diff > 30 && diff < 330) {
+                    dToTurn = getDistance(lat, lon, currentRoutePath[i][0], currentRoutePath[i][1]);
+                    if (diff > 150 && diff < 210) { turnText = "U-turn"; turnIcon = "↩️"; }
+                    else if (diff >= 30 && diff <= 150) { turnText = diff < 60 ? "Slight right" : "Turn right"; turnIcon = "↗️"; }
+                    else { turnText = diff > 300 ? "Slight left" : "Turn left"; turnIcon = "↖️"; }
+                    break;
+                }
+            }
+            
+            document.getElementById('nav-arrow').textContent = turnIcon;
+            document.getElementById('nav-instruction').textContent = turnText;
+            document.getElementById('nav-distance').textContent = Math.round(dToTurn) + 'm';
             document.getElementById('nav-banner').style.display = 'flex';
         }
 

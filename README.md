@@ -16,6 +16,8 @@
 *   📈 **Dynamic Data Sync:** Uses the Overpass API to pull the latest buildings and walkable paths directly from OpenStreetMap, with background updates every 3 months.
 *   ☁️ **Instant Over-the-Air Updates:** Employs a strict Network-First caching strategy for the core app shell, ensuring that you always get the latest features pushed to GitHub Pages the moment you are online, with instant offline fallback.
 *   🔁 **Resilient Error Recovery:** When the map data server is temporarily unavailable (rate-limited), the app shows a clear explanation and a one-tap **Retry** button instead of a dead screen.
+*   🏛️ **Campus-Only Search:** Buildings are filtered through the exact OSM campus polygon at data-processing time. Nothing outside the boundary ever appears in search results.
+*   🏷️ **Clean POI Labels:** All raw OSM tags (`yes`, `student_accommodation`, etc.) are mapped to human-readable labels like `Building`, `Student Accommodation`, `Café`, etc.
 
 ---
 

@@ -55,6 +55,11 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
 *   **Graceful 429 Error Handling:** When the Overpass API rate-limits the client and the local cache is empty, the loading screen now shows a clear explanation and a **"↺ Retry"** button instead of silently failing with a cryptic error.
 *   **SW `waitUntil` InvalidStateError Fix:** Moved `event.waitUntil()` to be called synchronously before the async fetch chain in the Stale-While-Revalidate handler, preventing the SW from throwing an `InvalidStateError` when attempting to extend a fetch event that had already settled.
 
+### Phase 7: Search Quality & Data Integrity
+*   **Campus-Only Geofencing:** Added a ray-casting point-in-polygon function. Every building extracted from OSM is checked against the official campus boundary polygon before being added to the search index. Buildings in the bounding box but outside the actual campus are silently discarded.
+*   **Clean POI Type Labels:** Replaced raw OSM tag values (`yes`, `student_accommodation`, `fast_food`, etc.) with a curated `TYPE_LABELS` lookup table that produces human-readable labels (`Building`, `Student Accommodation`, `Food Stall`). Any unlabelled tag is auto-capitalised and de-underscored as a fallback.
+*   **IndexedDB v7:** Bumped the cache version to force a clean graph rebuild incorporating the geofenced buildings and corrected type labels.
+
 ---
 
 ## ⚡ Service Worker precaching & Offline Strategy

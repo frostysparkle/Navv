@@ -384,7 +384,7 @@
         }
 
         // IndexedDB logic remains same
-        const DB_NAME = 'Navv_Map_DB', DB_VERSION = 6, STORE_NAME = 'campusData';
+        const DB_NAME = 'Navv_Map_DB', DB_VERSION = 7, STORE_NAME = 'campusData';
         let cachedIdfMap = null, cachedAvgDocLen = 0, idfComputed = false;
         async function initDB() { return new Promise((res, rej) => { const req = indexedDB.open(DB_NAME, DB_VERSION); req.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME); }; req.onsuccess = (e) => res(e.target.result); req.onerror = (e) => rej(e.target.error); }); }
         async function getCachedData() { const db = await initDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readonly'); const store = tx.objectStore(STORE_NAME); const req = store.get('navv_data'); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
@@ -430,6 +430,42 @@ out geom;`;
         function processOSMData(osmData) {
             const data = { buildings: [], graph: { nodes: {}, edges: {} }, boundary: null };
             const allNodes = {};
+
+            // ── Point-in-polygon (ray casting) ──────────────────────────────
+            function pointInPolygon(lat, lon, polygon) {
+                // polygon: array of [lon, lat] coordinate pairs
+                let inside = false;
+                for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                    const xi = polygon[i][0], yi = polygon[i][1];
+                    const xj = polygon[j][0], yj = polygon[j][1];
+                    if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+                }
+                return inside;
+            }
+
+            // ── Human-readable type labels ───────────────────────────────────
+            const TYPE_LABELS = {
+                yes: 'Building', building: 'Building', house: 'Building',
+                university: 'University Building', school: 'School',
+                library: 'Library', hospital: 'Hospital', clinic: 'Clinic',
+                restaurant: 'Restaurant', cafe: 'Café', canteen: 'Canteen', food_court: 'Food Court', fast_food: 'Food Stall',
+                hostel: 'Hostel', dormitory: 'Hostel', student_accommodation: 'Student Accommodation',
+                research: 'Research Centre', laboratory: 'Laboratory', lab: 'Laboratory',
+                auditorium: 'Auditorium', hall: 'Hall', theatre: 'Theatre',
+                office: 'Office', administrative: 'Administrative Building',
+                sports_centre: 'Sports Centre', gym: 'Gym', swimming_pool: 'Swimming Pool',
+                park: 'Park', garden: 'Garden', pitch: 'Sports Pitch', track: 'Track',
+                convenience: 'Convenience Store', shop: 'Shop', marketplace: 'Marketplace',
+                atm: 'ATM', bank: 'Bank', pharmacy: 'Pharmacy',
+                place_of_worship: 'Place of Worship', temple: 'Temple',
+                bus_stop: 'Bus Stop', parking: 'Parking',
+                fuel: 'Fuel Station', bicycle_parking: 'Bicycle Parking',
+            };
+            function cleanType(tags) {
+                const raw = tags.amenity || tags.building || tags.leisure || tags.shop || tags.tourism || 'POI';
+                return TYPE_LABELS[raw] || raw.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            }
+
             osmData.elements.forEach(el => { if (el.type === 'node') allNodes[el.id] = [el.lat, el.lon]; });
             
             // Boundary stitching logic
@@ -454,7 +490,7 @@ out geom;`;
                 const tags = el.tags || {};
                 const isPOI = tags.name && (tags.building || tags.amenity || tags.leisure || tags.shop || tags.tourism);
                 const getAliases = (t) => { const a = []; if (t.alt_name) a.push(t.alt_name); if (t.short_name) a.push(t.short_name); if (t['name:en']) a.push(t['name:en']); return a; };
-                if (el.type === 'node' && isPOI) data.buildings.push({ id: el.id, name: tags.name, lat: el.lat, lon: el.lon, aliases: getAliases(tags), type: tags.building || tags.amenity || tags.leisure || 'POI' });
+                if (el.type === 'node' && isPOI) data.buildings.push({ id: el.id, name: tags.name, lat: el.lat, lon: el.lon, aliases: getAliases(tags), type: cleanType(tags) });
                 else if (el.type === 'way') {
                     if (tags.highway) {
                         for (let i = 0; i < el.nodes.length; i++) {
@@ -475,14 +511,20 @@ out geom;`;
                     if (isPOI) {
                         let lat = 0, lon = 0, count = 0;
                         if (el.geometry) el.geometry.forEach(p => { lat += p.lat; lon += p.lon; count++; });
-                        if (count > 0) data.buildings.push({ id: el.id, name: tags.name, lat: lat / count, lon: lon / count, aliases: getAliases(tags), type: tags.building || tags.amenity || tags.leisure || 'POI', nodes: el.nodes || [] });
+                        if (count > 0) data.buildings.push({ id: el.id, name: tags.name, lat: lat / count, lon: lon / count, aliases: getAliases(tags), type: cleanType(tags), nodes: el.nodes || [] });
                     }
                 } else if (el.type === 'relation' && isPOI) {
                     let lat = 0, lon = 0, count = 0;
                     el.members.forEach(m => { if (m.type === 'way' && m.geometry) m.geometry.forEach(p => { lat += p.lat; lon += p.lon; count++; }); });
-                    if (count > 0) data.buildings.push({ id: el.id, name: tags.name, lat: lat / count, lon: lon / count, aliases: getAliases(tags), type: tags.building || tags.amenity || tags.leisure || 'POI' });
+                    if (count > 0) data.buildings.push({ id: el.id, name: tags.name, lat: lat / count, lon: lon / count, aliases: getAliases(tags), type: cleanType(tags) });
                 }
             });
+
+            // ── Filter buildings to campus polygon only ──────────────────────
+            if (data.boundary && data.boundary.coordinates && data.boundary.coordinates[0]) {
+                const poly = data.boundary.coordinates[0]; // array of [lon, lat]
+                data.buildings = data.buildings.filter(b => pointInPolygon(b.lat, b.lon, poly));
+            }
 
             // Virtual nodes and connections
             data.buildings.forEach(b => {

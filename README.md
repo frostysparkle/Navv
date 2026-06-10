@@ -15,6 +15,7 @@
 *   🛡️ **Strict Geofencing:** Keeps the experience focused and reliable with locked map viewports and GPS boundary validation.
 *   📈 **Dynamic Data Sync:** Uses the Overpass API to pull the latest buildings and walkable paths directly from OpenStreetMap, with background updates every 3 months.
 *   ☁️ **Instant Over-the-Air Updates:** Employs a strict Network-First caching strategy for the core app shell, ensuring that you always get the latest features pushed to GitHub Pages the moment you are online, with instant offline fallback.
+*   🔁 **Resilient Error Recovery:** When the map data server is temporarily unavailable (rate-limited), the app shows a clear explanation and a one-tap **Retry** button instead of a dead screen.
 
 ---
 
@@ -23,7 +24,7 @@
 Navv is built on a strict **Two-File Philosophy** to ensure maximum performance and maintainability:
 
 1.  **`index.html`**: The entire application shell. It contains the UI (Modern Indigo CSS), the client-side data engine, the routing logic (Custom Dijkstra), and map initialization.
-2.  **`sw.js`**: A robust Service Worker responsible for aggressive asset caching and automated, rate-limited map tile pre-caching for full offline reliability.
+2.  **`sw.js`**: A robust Service Worker responsible for aggressive asset caching, automated rate-limited map tile pre-caching, and immediate activation via `skipWaiting()` for instant OTA updates.
 
 ---
 

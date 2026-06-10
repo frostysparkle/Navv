@@ -10,7 +10,7 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
 *   **`index.html`:** The entire frontend application shell, containing:
     *   Responsive, Google Maps inspired modern UI/UX styles.
     *   **Dynamic Data Engine:** Direct client-side integration with the **Overpass API** to fetch the latest campus buildings, paths, and boundaries.
-    *   **Offline Cache:** Utilizes **IndexedDB** (v4) to store the processed routing graph and POI data locally for instant offline loading and periodic 3-month background updates.
+    *   **Offline Cache:** Utilizes **IndexedDB** (v6) to store the processed routing graph and POI data locally for instant offline loading and periodic 3-month background updates.
     *   Leaflet.js map layer initialization with strict boundary enforcement and high-zoom level support (up to 22).
     *   High-accuracy client-side pathfinding engine (Custom Dijkstra) with "Virtual Building Nodes" for multi-entrance buildings.
     *   Live GPS tracking with geofencing and movement-based heading calculation.
@@ -49,6 +49,12 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
 *   **Alternative Route Optimization:** Re-engineered the alternate routing mechanic to dynamically select the nearest future non-building node for blocking, completely avoiding staleness and off-by-one bugs. Recalculation now purges the entire path and re-routes from the exact GPS location.
 *   **Network-First Auto Updates:** Overhauled the Service Worker to apply a strict Network-First strategy to all local app shell files (`.html`, `.js`, `.css`), enabling instant over-the-air updates from GitHub Pages for online users while retaining fallback offline support.
 
+### Phase 6: Stability Hotfixes
+*   **SW Immediate Activation:** Added `self.skipWaiting()` to the SW install event so updated service workers activate immediately on next load, without requiring the user to close all tabs.
+*   **TypeError: `nid.startsWith` Fix:** OSM node IDs from the Overpass API are raw numbers, not strings. The building graph connection logic now coerces all node IDs with `String(nid)` before calling `.startsWith('b_')`, eliminating a hard crash during graph processing.
+*   **Graceful 429 Error Handling:** When the Overpass API rate-limits the client and the local cache is empty, the loading screen now shows a clear explanation and a **"↺ Retry"** button instead of silently failing with a cryptic error.
+*   **SW `waitUntil` InvalidStateError Fix:** Moved `event.waitUntil()` to be called synchronously before the async fetch chain in the Stale-While-Revalidate handler, preventing the SW from throwing an `InvalidStateError` when attempting to extend a fetch event that had already settled.
+
 ---
 
 ## ⚡ Service Worker precaching & Offline Strategy
@@ -72,6 +78,7 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
 
 ## 📈 Current Project State & Verification Status
 *   **Offline Capability:** 100% Functional.
-*   **Navigation Stability:** High (includes segment-distance math and path smoothing).
+*   **Navigation Stability:** High (includes segment-distance math, path smoothing, and wrong-way detection).
 *   **Search Robustness:** Excellent (supports abbreviations and fuzzy matching).
 *   **UI/UX Aesthetic:** Modern, high-performance, Google Maps inspired.
+*   **Service Worker:** Robust — immediate activation, Network-First shell updates, graceful error recovery.

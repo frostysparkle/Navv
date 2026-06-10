@@ -53,7 +53,15 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       console.log('[SW] Caching Navv app shell');
-      return cache.addAll(ASSETS_TO_CACHE);
+      // Use timestamp query params to bypass HTTP cache for the app shell during installation
+      return Promise.all(
+        ASSETS_TO_CACHE.map(url => {
+          return fetch(`${url}?_cb=${Date.now()}`, { cache: 'no-cache' }).then(response => {
+            if (!response.ok) throw new Error('Fetch failed for ' + url);
+            return cache.put(url, response);
+          });
+        })
+      );
     }).then(() => {
       console.log('[SW] App shell cached, skipping waiting');
       return self.skipWaiting();
@@ -168,10 +176,10 @@ self.addEventListener('fetch', event => {
 
   // 2. App shell (HTML navigation, Manifest) → Network-First
   // This ensures users always get the latest version if online.
-  // Using request.mode === 'navigate' safely catches the app shell.
+  // We use { cache: 'no-cache' } to bypass the browser's HTTP cache (e.g. GitHub Pages 10min limit)
   if (event.request.mode === 'navigate' || url.pathname.endsWith('manifest.json')) {
     event.respondWith(
-      fetch(event.request).then(resp => {
+      fetch(event.request.url, { cache: 'no-cache' }).then(resp => {
         if (resp.ok) {
           const clone = resp.clone();
           caches.open(CACHE_NAME).then(c => c.put(event.request, clone));

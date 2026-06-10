@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#4F46E5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/frostysparkle/Navv/main/icon-192.png">
+    <link rel="apple-touch-icon" href="./icon.svg">
     
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
@@ -40,231 +40,169 @@
         
         :root {
             --primary: #4F46E5;
-            --primary-dark: #4338CA;
             --primary-light: #818CF8;
             --danger: #EF4444;
-            --bg-glass: rgba(255, 255, 255, 0.85);
-            --bg-glass-hover: rgba(255, 255, 255, 0.95);
+            --bg-glass: rgba(255, 255, 255, 0.8);
             --bg-solid: #ffffff;
-            --border-glass: 1px solid rgba(0, 0, 0, 0.08);
-            --divider: 1px solid rgba(0, 0, 0, 0.05);
             --text-main: #111827;
             --text-muted: #6B7280;
-            --text-inverse: #ffffff;
-            --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.05);
-            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.1);
-            --radius-sm: 12px;
-            --radius-md: 20px;
-            --radius-lg: 28px;
-            --radius-full: 9999px;
+            --border: rgba(0, 0, 0, 0.08);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             --blur: blur(20px);
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-glass: rgba(24, 24, 27, 0.85);
-                --bg-glass-hover: rgba(39, 39, 42, 0.95);
-                --bg-solid: #18181b;
-                --border-glass: 1px solid rgba(255, 255, 255, 0.1);
-                --divider: 1px solid rgba(255, 255, 255, 0.05);
-                --text-main: #F9FAFB;
-                --text-muted: #9CA3AF;
-                --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.4);
-            }
+        body.dark-theme {
+            --bg-glass: rgba(24, 24, 27, 0.8);
+            --bg-solid: #18181b;
+            --text-main: #F9FAFB;
+            --text-muted: #9CA3AF;
+            --border: rgba(255, 255, 255, 0.1);
+            --shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
         }
 
         body { 
             margin: 0; padding: 0; 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            font-family: 'Inter', sans-serif; 
             background: var(--bg-solid); 
             color: var(--text-main);
             -webkit-tap-highlight-color: transparent; 
             overflow: hidden;
+            transition: background 0.3s ease;
         }
         #map { height: 100vh; width: 100vw; z-index: 1; }
-        
-        /* Typography */
-        h2 { margin: 0 0 4px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-        p { margin: 0; }
-        .text-muted { color: var(--text-muted); }
-        .text-sm { font-size: 13px; font-weight: 500; }
-        .text-xs { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-        
-        /* Glass Panel Base */
-        .glass-panel {
+
+        .glass {
             background: var(--bg-glass);
             backdrop-filter: var(--blur);
             -webkit-backdrop-filter: var(--blur);
-            border: var(--border-glass);
-            box-shadow: var(--shadow-lg);
-            color: var(--text-main);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
         }
-        
-        /* Buttons */
-        .btn {
-            display: flex; align-items: center; justify-content: center;
-            border: none; outline: none; cursor: pointer;
-            font-family: inherit; font-weight: 600; font-size: 15px;
-            transition: all 0.2s ease;
-        }
-        .btn:active { transform: scale(0.96); }
-        .btn-primary { background: var(--primary); color: var(--text-inverse); box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3); }
-        .btn-danger { background: var(--danger); color: var(--text-inverse); box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3); }
-        .btn-icon { width: 56px; height: 56px; border-radius: var(--radius-full); }
-        .btn-large { padding: 18px; border-radius: 18px; flex: 1; font-size: 16px; }
-        
-        /* Layout Stacks */
-        .ui-top-stack {
+
+        /* Top HUD */
+        .ui-top {
             position: fixed; top: env(safe-area-inset-top, 20px); left: 0; width: 100%;
-            display: flex; flex-direction: column; align-items: center; gap: 12px;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
             z-index: 2000; pointer-events: none;
         }
-        .ui-top-stack > * { pointer-events: auto; }
-        
-        .ui-bottom-stack {
-            position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 24px)); left: 50%; transform: translateX(-50%);
-            width: 100%; max-width: 440px; padding: 0 16px; box-sizing: border-box;
-            display: flex; flex-direction: column; align-items: stretch; gap: 16px;
-            z-index: 1000; transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            pointer-events: none;
-        }
-        .ui-bottom-stack > * { pointer-events: auto; }
+        .ui-top > * { pointer-events: auto; }
 
-        /* Specific Components */
-        .pill-badge {
-            padding: 12px 24px; border-radius: var(--radius-full);
-            font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;
-            box-shadow: var(--shadow-lg); white-space: nowrap;
+        .install-banner {
+            padding: 12px 20px; border-radius: 99px; font-size: 13px; font-weight: 600;
+            display: none; align-items: center; gap: 12px;
         }
-        
-        .nav-banner {
-            width: 90%; max-width: 360px; padding: 16px 24px; border-radius: var(--radius-full);
-            display: none; align-items: center; gap: 16px;
+
+        /* Unified Bottom Capsule */
+        .ui-bottom {
+            position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 24px)); left: 50%;
+            transform: translateX(-50%); width: 92%; max-width: 440px;
+            display: flex; flex-direction: column; gap: 12px;
+            z-index: 1000; transition: bottom 0.4s ease;
         }
-        
-        .search-wrapper {
-            position: relative; width: 100%; border-radius: var(--radius-full); overflow: hidden;
-            display: flex; align-items: center;
+
+        .control-capsule {
+            display: flex; align-items: center; padding: 6px; border-radius: 99px;
         }
+
+        .icon-btn {
+            width: 44px; height: 44px; border-radius: 50%; border: none;
+            background: transparent; color: var(--text-main);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 20px; transition: all 0.2s;
+        }
+        .icon-btn:active { transform: scale(0.9); background: rgba(128,128,128,0.1); }
+        .icon-btn.active { color: var(--primary); }
+
         .search-input {
-            width: 100%; padding: 18px 24px; padding-right: 50px; font-size: 16px;
-            border: none; background: transparent; outline: none; font-family: inherit; font-weight: 500; color: inherit;
+            flex: 1; border: none; background: transparent; outline: none;
+            padding: 0 12px; font-family: inherit; font-size: 16px;
+            font-weight: 500; color: var(--text-main);
         }
-        .search-clear {
-            position: absolute; right: 12px; width: 32px; height: 32px; border-radius: var(--radius-full);
-            background: rgba(128,128,128,0.15); color: var(--text-muted);
-            display: none; align-items: center; justify-content: center; font-size: 16px;
-        }
-        
+
         .search-results {
-            position: absolute; bottom: calc(100% + 12px); left: 0; width: 100%; max-height: 320px; overflow-y: auto;
-            border-radius: var(--radius-md); display: none; z-index: 3000;
+            position: absolute; bottom: 70px; left: 0; width: 100%; max-height: 300px;
+            border-radius: 24px; overflow-y: auto; display: none;
         }
-        .search-result-item {
-            padding: 16px 20px; border-bottom: var(--divider); cursor: pointer; display: flex; align-items: center; gap: 14px;
+        .result-item {
+            padding: 14px 20px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 12px; cursor: pointer;
         }
-        .search-result-item:last-child { border-bottom: none; }
-        .search-result-item:hover { background: var(--bg-glass-hover); }
-        .search-icon-wrapper {
-            width: 40px; height: 40px; border-radius: var(--radius-full); background: rgba(128,128,128,0.1);
-            display: flex; align-items: center; justify-content: center; font-size: 20px;
-        }
-        
+        .result-item:last-child { border-bottom: none; }
+
+        /* Bottom Sheet */
         .bottom-sheet {
             position: fixed; bottom: 0; left: 0; width: 100%; z-index: 1500;
-            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 32px 32px 0 0; transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             padding: 12px 24px max(24px, env(safe-area-inset-bottom)); box-sizing: border-box;
-            border-bottom: none; display: flex; flex-direction: column;
         }
-        .sheet-handle {
-            width: 40px; height: 5px; background: rgba(128,128,128,0.2); border-radius: var(--radius-full); margin: 4px auto 16px;
+        .handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+
+        .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+        .main-btn {
+            flex: 1; padding: 16px; border: none; border-radius: 18px;
+            font-weight: 700; font-size: 15px; cursor: pointer; transition: opacity 0.2s;
         }
-        
-        /* Map Animations */
+        .main-btn:active { opacity: 0.7; }
+
+        /* Animations */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinning { animation: spin 1s linear infinite; }
         @keyframes marching-ants { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
         .route-path-animated { animation: marching-ants 1s linear infinite; }
 
-        /* Loading */
         #loading {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: var(--bg-solid); z-index: 9999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            transition: opacity 0.4s ease;
+            transition: opacity 0.5s ease;
         }
-        .spinner {
-            width: 40px; height: 40px; border: 4px solid var(--divider); border-top: 4px solid var(--primary);
-            border-radius: var(--radius-full); animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
-<body>
-    <div id="loading" aria-hidden="true">
-        <div class="spinner"></div>
-        <p style="margin-top:15px; font-weight:bold;" class="text-muted">Loading Navv...</p>
+<body class="light-theme">
+    <div id="loading">
+        <div style="width:40px; height:40px; border:4px solid var(--border); border-top-color:var(--primary); border-radius:50%;" class="spinning"></div>
     </div>
 
     <div id="map"></div>
-    
-    <!-- Top HUD: Notifications & Info -->
-    <div class="ui-top-stack">
-        <div id="offline-indicator" class="pill-badge" style="background: var(--danger); color: white; display: none;">
-            ⚠️ Offline Mode Active
-        </div>
 
-        <div id="toast" class="glass-panel pill-badge" style="opacity: 0; transition: opacity 0.3s; background: var(--text-main); color: var(--bg-solid);">
-            Notification
+    <div class="ui-top">
+        <div id="install-prompt" class="glass install-banner">
+            <span id="install-text">Install Navv for the best experience</span>
+            <button id="install-button" style="background:var(--primary); color:white; border:none; padding:6px 16px; border-radius:20px; font-weight:700; font-size:12px;">Install</button>
+            <button id="install-close" style="background:transparent; border:none; color:var(--text-muted); font-size:18px;">✕</button>
         </div>
-
-        <div id="nav-banner" class="glass-panel nav-banner">
-            <div id="nav-arrow" style="font-size: 32px; min-width: 44px; text-align: center;">⬆️</div>
-            <div style="flex: 1; min-width: 0;">
-                <div id="nav-distance" class="text-xs text-muted">Calculating...</div>
-                <div id="nav-instruction" style="font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Getting route...</div>
+        <div id="offline-indicator" class="glass" style="padding:10px 20px; border-radius:99px; color:var(--danger); font-weight:700; font-size:13px; display:none;">⚠️ Offline</div>
+        <div id="toast" class="glass" style="padding:12px 24px; border-radius:99px; font-weight:600; font-size:14px; opacity:0; transition:opacity 0.3s;">Notification</div>
+        <div id="nav-banner" class="glass" style="width:90%; max-width:350px; padding:16px; border-radius:24px; display:none; align-items:center; gap:16px;">
+            <div id="nav-arrow" style="font-size:32px;">⬆️</div>
+            <div style="flex:1; min-width:0;">
+                <div id="nav-distance" style="font-size:11px; color:var(--text-muted); font-weight:700; text-transform:uppercase;">...</div>
+                <div id="nav-instruction" style="font-size:17px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">...</div>
             </div>
         </div>
     </div>
 
-    <!-- Bottom HUD: Search & Controls -->
-    <div class="ui-bottom-stack" id="bottom-hud">
-        <!-- Minimal Tile Progress -->
-        <div id="tile-progress-bar" class="glass-panel pill-badge" style="display: none; padding: 12px 20px; font-size: 12px; font-weight: 600; justify-content: center; gap: 12px; max-width: 240px; margin: 0 auto;">
-            <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: pulse 1.5s infinite;"></div>
-            <span>Downloading Maps...</span>
-            <span id="tile-progress-pct" style="color: var(--primary);">0%</span>
-        </div>
-
-        <div style="position: relative; width: 100%;">
-            <div class="glass-panel search-wrapper">
+    <div class="ui-bottom" id="bottom-hud">
+        <div style="position:relative; width:100%;">
+            <div class="glass search-results" id="search-results"></div>
+            <div class="glass control-capsule">
+                <button id="theme-toggle" class="icon-btn" aria-label="Toggle Dark Mode">🌙</button>
                 <input type="text" id="search-input" class="search-input" placeholder="Search campus...">
-                <button id="search-clear" class="btn search-clear">✕</button>
-            </div>
-            <div id="search-results" class="glass-panel search-results"></div>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end;">
-            <div id="gps-button" class="glass-panel btn btn-icon" role="button" aria-label="Find my location" tabindex="0">
-                <svg id="gps-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                <button id="gps-button" class="icon-btn" aria-label="Center location">
+                    <svg id="gps-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- GPS Locating Indicator -->
-    <div id="gps-locating" class="glass-panel pill-badge" style="position: fixed; bottom: max(100px, env(safe-area-inset-bottom, 100px)); right: 16px; z-index: 1000; display: none;">
-        <div style="width: 14px; height: 14px; border: 2px solid var(--text-muted); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
-        Locating...
-    </div>
-
-    <!-- Bottom Route Card -->
-    <div id="route-card" class="glass-panel bottom-sheet">
-        <div class="sheet-handle"></div>
-        <h2 id="route-dest-name">Destination</h2>
-        <p id="route-distance" class="text-muted text-sm" style="margin-bottom: 20px;">Calculating...</p>
-        <div style="display:flex; gap:12px;">
-            <button id="alt-route-btn" class="btn btn-primary btn-large">Alternate Route</button>
-            <button id="cancel-route-btn" class="btn btn-danger btn-large">End</button>
+    <div id="route-card" class="glass bottom-sheet">
+        <div class="handle"></div>
+        <h2 id="route-dest-name" style="font-size:22px; font-weight:800; margin:0;">Destination</h2>
+        <p id="route-distance" style="color:var(--text-muted); font-weight:600; font-size:14px; margin:4px 0 0 0;">Calculating...</p>
+        <div class="btn-row">
+            <button id="alt-route-btn" class="main-btn" style="background:var(--primary); color:white;">Alternate</button>
+            <button id="cancel-route-btn" class="main-btn" style="background:rgba(128,128,128,0.1); color:var(--text-main);">End</button>
         </div>
     </div>
 
@@ -272,9 +210,67 @@
         let campusData = null;
         let map, userMarker, userLocation, watchId, currentHeading, currentDestination, currentDestinationName, destinationMarker, currentRoutePolyline, currentRoutePath = [], currentPathIds = [], isFollowing = false, toastTimeout, campusBounds, userHeading = null, lastLoc = null, firstPos = true;
         let blockedNodeIds = new Set();
+        let isCalculatingRoute = false;
 
-        // --- PHASE 3 LOGIC (Dijkstra, Distance, etc.) ---
-        
+        // --- THEME LOGIC ---
+        function applyTheme(theme) {
+            const body = document.body;
+            const toggle = document.getElementById('theme-toggle');
+            if (theme === 'dark') {
+                body.classList.add('dark-theme');
+                body.classList.remove('light-theme');
+                toggle.textContent = '☀️';
+            } else {
+                body.classList.add('light-theme');
+                body.classList.remove('dark-theme');
+                toggle.textContent = '🌙';
+            }
+            localStorage.setItem('theme', theme);
+        }
+
+        const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(savedTheme);
+
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const current = document.body.classList.contains('dark-theme') ? 'light' : 'dark';
+            applyTheme(current);
+        });
+
+        // --- PWA INSTALL LOGIC ---
+        let deferredPrompt;
+        const installBanner = document.getElementById('install-prompt');
+        const installBtn = document.getElementById('install-button');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBanner.style.display = 'flex';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') console.log('User accepted install');
+                deferredPrompt = null;
+                installBanner.style.display = 'none';
+            } else {
+                // Manual instruction for iOS
+                showToast("Tap Share -> Add to Home Screen to install.");
+            }
+        });
+
+        document.getElementById('install-close').addEventListener('click', () => { installBanner.style.display = 'none'; });
+
+        // Detection for iOS Safari
+        const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+        const isStandalone = window.navigator.standalone === true;
+        if (isIos && !isStandalone) {
+            document.getElementById('install-text').textContent = "Install Navv for offline use";
+            installBanner.style.display = 'flex';
+        }
+
+        // --- ROUTING LOGIC ---
         class PriorityQueue {
             constructor() { this.elements = []; }
             enqueue(element, priority) {
@@ -287,206 +283,74 @@
 
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
-            const φ1 = lat1 * Math.PI/180;
-            const φ2 = lat2 * Math.PI/180;
-            const Δφ = (lat2-lat1) * Math.PI/180;
-            const Δλ = (lon2-lon1) * Math.PI/180;
+            const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
             const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        // --- DATA FETCHING & CACHING ---
-        const DB_NAME = 'Navv_Map_DB';
-        const DB_VERSION = 4;
-        const STORE_NAME = 'campusData';
-
-        async function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME);
-                };
-                request.onsuccess = (e) => resolve(e.target.result);
-                request.onerror = (e) => reject(e.target.error);
-            });
-        }
-
-        async function getCachedData() {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction(STORE_NAME, 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.get('navv_data');
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        async function saveToCache(data) {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction(STORE_NAME, 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.put({ data, timestamp: Date.now() }, 'navv_data');
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
-        }
+        // IndexedDB logic remains same
+        const DB_NAME = 'Navv_Map_DB', DB_VERSION = 4, STORE_NAME = 'campusData';
+        async function initDB() { return new Promise((res, rej) => { const req = indexedDB.open(DB_NAME, DB_VERSION); req.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME); }; req.onsuccess = (e) => res(e.target.result); req.onerror = (e) => rej(e.target.error); }); }
+        async function getCachedData() { const db = await initDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readonly'); const store = tx.objectStore(STORE_NAME); const req = store.get('navv_data'); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
+        async function saveToCache(data) { const db = await initDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); const req = store.put({ data, timestamp: Date.now() }, 'navv_data'); req.onsuccess = () => res(); req.onerror = () => rej(req.error); }); }
 
         async function fetchFromOverpass() {
-            const query = `[out:json][timeout:900];
-area["name"="Indian Institute of Technology - Madras"]->.iitm;
-(
-  node(area.iitm);
-  way(area.iitm);
-  relation(area.iitm);
-  relation["name"="Indian Institute of Technology - Madras"];
-  way["name"="Indian Institute of Technology - Madras"];
-);
-out geom;`;
-            const url = 'https://overpass-api.de/api/interpreter';
-            const response = await fetch(url, {
-                method: 'POST',
-                body: "data=" + encodeURIComponent(query),
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            });
-            if (!response.ok) throw new Error('Overpass fetch failed');
-            return await response.json();
+            const query = `[out:json][timeout:900]; area["name"="Indian Institute of Technology - Madras"]->.iitm; (node(area.iitm); way(area.iitm); relation(area.iitm); relation["name"="Indian Institute of Technology - Madras"]; way["name"="Indian Institute of Technology - Madras"]; ); out geom;`;
+            const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: "data=" + encodeURIComponent(query), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+            if (!res.ok) throw new Error('Overpass fail');
+            return await res.json();
         }
 
         function processOSMData(osmData) {
             const data = { buildings: [], graph: { nodes: {}, edges: {} }, boundary: null };
             const allNodes = {};
             osmData.elements.forEach(el => { if (el.type === 'node') allNodes[el.id] = [el.lat, el.lon]; });
-
             osmData.elements.forEach(el => {
                 const tags = el.tags || {};
-                
-                // Boundary detection
                 if (tags.name === 'Indian Institute of Technology - Madras' || tags.name === 'Indian Institute of Technology Madras') {
                     let coords = [];
-                    if (el.type === 'way' && el.geometry) {
-                        coords = el.geometry.map(p => [p.lon, p.lat]);
-                    } else if (el.type === 'relation' && el.members) {
-                        el.members.forEach(m => {
-                            if (m.role === 'outer' && m.geometry) {
-                                coords.push(...m.geometry.map(p => [p.lon, p.lat]));
-                            }
-                        });
-                    }
-                    if (coords.length > 0) {
-                        console.log("Boundary found for " + tags.name);
-                        data.boundary = { type: 'Polygon', coordinates: [coords] };
-                    }
+                    if (el.type === 'way' && el.geometry) coords = el.geometry.map(p => [p.lon, p.lat]);
+                    else if (el.type === 'relation' && el.members) el.members.forEach(m => { if (m.role === 'outer' && m.geometry) coords.push(...m.geometry.map(p => [p.lon, p.lat])); });
+                    if (coords.length > 0) data.boundary = { type: 'Polygon', coordinates: [coords] };
                 }
-
-                const isPointOfInterest = tags.name && (tags.building || tags.amenity || tags.leisure || tags.shop || tags.tourism);
-                
-                const getAliases = (t) => {
-                    const a = [];
-                    if (t.alt_name) a.push(t.alt_name);
-                    if (t.short_name) a.push(t.short_name);
-                    if (t['name:en']) a.push(t['name:en']);
-                    return a;
-                };
-
-                if (el.type === 'node' && isPointOfInterest) {
-                    data.buildings.push({
-                        id: el.id, name: tags.name, lat: el.lat, lon: el.lon,
-                        aliases: getAliases(tags),
-                        type: tags.building || tags.amenity || tags.leisure || 'POI'
-                    });
-                } else if (el.type === 'way') {
+                const isPOI = tags.name && (tags.building || tags.amenity || tags.leisure || tags.shop || tags.tourism);
+                const getAliases = (t) => { const a = []; if (t.alt_name) a.push(t.alt_name); if (t.short_name) a.push(t.short_name); if (t['name:en']) a.push(t['name:en']); return a; };
+                if (el.type === 'node' && isPOI) data.buildings.push({ id: el.id, name: tags.name, lat: el.lat, lon: el.lon, aliases: getAliases(tags), type: tags.building || tags.amenity || tags.leisure || 'POI' });
+                else if (el.type === 'way') {
                     if (tags.highway) {
                         for (let i = 0; i < el.nodes.length; i++) {
-                            const nid = el.nodes[i];
-                            const coords = el.geometry ? [el.geometry[i].lon, el.geometry[i].lat] : (allNodes[nid] ? [allNodes[nid][1], allNodes[nid][0]] : null);
+                            const nid = el.nodes[i], coords = el.geometry ? [el.geometry[i].lon, el.geometry[i].lat] : (allNodes[nid] ? [allNodes[nid][1], allNodes[nid][0]] : null);
                             if (!coords) continue;
                             if (!data.graph.nodes[nid]) data.graph.nodes[nid] = coords;
                             if (i > 0) {
-                                const prevNid = el.nodes[i - 1];
-                                const prevCoords = el.geometry ? [el.geometry[i-1].lon, el.geometry[i-1].lat] : (allNodes[prevNid] ? [allNodes[prevNid][1], allNodes[prevNid][0]] : null);
-                                if (prevCoords) {
-                                    const dist = getDistance(coords[1], coords[0], prevCoords[1], prevCoords[0]);
-                                    if (!data.graph.edges[nid]) data.graph.edges[nid] = {};
-                                    if (!data.graph.edges[prevNid]) data.graph.edges[prevNid] = {};
-                                    data.graph.edges[nid][prevNid] = dist;
-                                    data.graph.edges[prevNid][nid] = dist;
-                                }
+                                const prevNid = el.nodes[i - 1], prevCoords = el.geometry ? [el.geometry[i-1].lon, el.geometry[i-1].lat] : (allNodes[prevNid] ? [allNodes[prevNid][1], allNodes[prevNid][0]] : null);
+                                if (prevCoords) { const dist = getDistance(coords[1], coords[0], prevCoords[1], prevCoords[0]); if (!data.graph.edges[nid]) data.graph.edges[nid] = {}; if (!data.graph.edges[prevNid]) data.graph.edges[prevNid] = {}; data.graph.edges[nid][prevNid] = dist; data.graph.edges[prevNid][nid] = dist; }
                             }
                         }
                     }
-                    if (isPointOfInterest) {
+                    if (isPOI) {
                         let lat = 0, lon = 0, count = 0;
                         if (el.geometry) el.geometry.forEach(p => { lat += p.lat; lon += p.lon; count++; });
-                        if (count > 0) {
-                            data.buildings.push({
-                                id: el.id, name: tags.name, lat: lat / count, lon: lon / count,
-                                aliases: getAliases(tags),
-                                type: tags.building || tags.amenity || tags.leisure || 'POI',
-                                nodes: el.nodes || []
-                            });
-                        }
+                        if (count > 0) data.buildings.push({ id: el.id, name: tags.name, lat: lat / count, lon: lon / count, aliases: getAliases(tags), type: tags.building || tags.amenity || tags.leisure || 'POI', nodes: el.nodes || [] });
                     }
-                } else if (el.type === 'relation') {
-                    if (isPointOfInterest) {
-                        let lat = 0, lon = 0, count = 0;
-                        el.members.forEach(m => { if (m.type === 'way' && m.geometry) { m.geometry.forEach(p => { lat += p.lat; lon += p.lon; count++; }); } });
-                        if (count > 0) {
-                            data.buildings.push({
-                                id: el.id, name: tags.name, lat: lat / count, lon: lon / count,
-                                aliases: getAliases(tags),
-                                type: tags.building || tags.amenity || tags.leisure || 'POI'
-                            });
-                        }
-                    }
+                } else if (el.type === 'relation' && isPOI) {
+                    let lat = 0, lon = 0, count = 0;
+                    el.members.forEach(m => { if (m.type === 'way' && m.geometry) m.geometry.forEach(p => { lat += p.lat; lon += p.lon; count++; }); });
+                    if (count > 0) data.buildings.push({ id: el.id, name: tags.name, lat: lat / count, lon: lon / count, aliases: getAliases(tags), type: tags.building || tags.amenity || tags.leisure || 'POI' });
                 }
             });
 
-            // Fallback boundary if none found
-            if (!data.boundary) {
-                console.warn("Explicit boundary not found, calculating fallback bounding box...");
-                let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
-                Object.values(data.graph.nodes).forEach(c => {
-                    minLon = Math.min(minLon, c[0]); maxLon = Math.max(maxLon, c[0]);
-                    minLat = Math.min(minLat, c[1]); maxLat = Math.max(maxLat, c[1]);
-                });
-                if (minLat !== 90) {
-                    data.boundary = { type: 'Polygon', coordinates: [[[minLon, minLat], [maxLon, minLat], [maxLon, maxLat], [minLon, maxLat], [minLon, minLat]]] };
-                }
-            }
-
-            // Virtual Building Nodes
+            // Virtual nodes and connections
             data.buildings.forEach(b => {
-                const bNodeId = `b_${b.id}`;
-                data.graph.nodes[bNodeId] = [b.lon, b.lat];
+                const bNodeId = `b_${b.id}`; data.graph.nodes[bNodeId] = [b.lon, b.lat];
                 if (!data.graph.edges[bNodeId]) data.graph.edges[bNodeId] = {};
                 let connected = false;
-                if (b.nodes) {
-                    b.nodes.forEach(nid => {
-                        if (data.graph.nodes[nid]) {
-                            data.graph.edges[bNodeId][nid] = 0;
-                            if (!data.graph.edges[nid]) data.graph.edges[nid] = {};
-                            data.graph.edges[nid][bNodeId] = 0;
-                            connected = true;
-                        }
-                    });
-                }
+                if (b.nodes) b.nodes.forEach(nid => { if (data.graph.nodes[nid]) { data.graph.edges[bNodeId][nid] = 0; if (!data.graph.edges[nid]) data.graph.edges[nid] = {}; data.graph.edges[nid][bNodeId] = 0; connected = true; } });
                 if (!connected) {
                     let nearestId = null, minDist = Infinity;
-                    for (const [nid, coords] of Object.entries(data.graph.nodes)) {
-                        if (nid.startsWith('b_')) continue;
-                        const d = getDistance(b.lat, b.lon, coords[1], coords[0]);
-                        if (d < minDist) { minDist = d; nearestId = nid; }
-                    }
-                    if (nearestId) {
-                        data.graph.edges[bNodeId][nearestId] = 0;
-                        if (!data.graph.edges[nearestId]) data.graph.edges[nearestId] = {};
-                        data.graph.edges[nearestId][bNodeId] = 0;
-                    }
+                    for (const [nid, coords] of Object.entries(data.graph.nodes)) { if (nid.startsWith('b_')) continue; const d = getDistance(b.lat, b.lon, coords[1], coords[0]); if (d < minDist) { minDist = d; nearestId = nid; } }
+                    if (nearestId) { data.graph.edges[bNodeId][nearestId] = 0; if (!data.graph.edges[nearestId]) data.graph.edges[nearestId] = {}; data.graph.edges[nearestId][bNodeId] = 0; }
                 }
             });
             return data;
@@ -495,40 +359,22 @@ out geom;`;
         async function loadApp() {
             try {
                 const cached = await getCachedData();
-                const threeMonths = 90 * 24 * 60 * 60 * 1000;
-                if (cached && (Date.now() - cached.timestamp < threeMonths)) {
-                    campusData = cached.data;
-                } else if (!navigator.onLine && cached) {
-                    campusData = cached.data;
-                } else {
-                    const osmData = await fetchFromOverpass();
-                    campusData = processOSMData(osmData);
-                    await saveToCache(campusData);
-                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                        navigator.serviceWorker.controller.postMessage({ type: 'REFRESH_TILES' });
-                    }
-                }
+                if (cached && (Date.now() - cached.timestamp < 90 * 24 * 60 * 60 * 1000)) campusData = cached.data;
+                else if (!navigator.onLine && cached) campusData = cached.data;
+                else { const osm = await fetchFromOverpass(); campusData = processOSMData(osm); await saveToCache(campusData); if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'REFRESH_TILES' }); }
                 initMap();
             } catch (err) {
                 console.error(err);
                 const cached = await getCachedData();
                 if (cached) { campusData = cached.data; initMap(); }
-                else { alert('Failed to load map data. Please check your connection.'); }
+                else alert('Failed to load map data. Check connection.');
             }
         }
 
-        // --- MAP & UI INITIALIZATION ---
-
         function initMap() {
             map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 22 }).setView([12.9914, 80.2337], 17);
-            
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
-                maxNativeZoom: 19,
-                maxZoom: 22
-            }).addTo(map);
-
-            map.on('dragstart', () => { isFollowing = false; });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxNativeZoom: 19, maxZoom: 22 }).addTo(map);
+            map.on('dragstart', () => { isFollowing = false; updateGPSUI(); });
 
             const worldCoords = [[90, -180], [90, 180], [-90, 180], [-90, -180]];
             let campusBoundaryCoords = [];
@@ -539,477 +385,208 @@ out geom;`;
             if (campusBoundaryCoords.length > 0) {
                 L.polygon([worldCoords, campusBoundaryCoords], { color: '#2c3e50', fillColor: '#000', fillOpacity: 0.7, weight: 3 }).addTo(map);
                 campusBounds = L.latLngBounds(campusBoundaryCoords);
-                // Expand the bounds by 50% to prevent jitter when zoomed out
-                const paddedBounds = campusBounds.pad(0.5);
-                map.setMaxBounds(paddedBounds);
-                // Lower viscosity creates an elastic 'bounce' instead of a hard stop
+                map.setMaxBounds(campusBounds.pad(0.5));
                 map.options.maxBoundsViscosity = 0.8;
             }
             
-            map.whenReady(() => {
-                setTimeout(() => {
-                    const loading = document.getElementById('loading');
-                    if (loading) { loading.style.opacity = '0'; setTimeout(() => loading.remove(), 500); }
-                }, 500);
-            });
+            map.whenReady(() => { setTimeout(() => { const loading = document.getElementById('loading'); if (loading) { loading.style.opacity = '0'; setTimeout(() => loading.remove(), 500); } }, 500); });
 
             setupUI();
             setupGeolocation();
         }
 
         function setupUI() {
-            // Offline Detection
             const offlineIndicator = document.getElementById('offline-indicator');
-            function updateOnlineStatus() { offlineIndicator.style.display = navigator.onLine ? 'none' : 'block'; }
-            window.addEventListener('online', updateOnlineStatus);
-            window.addEventListener('offline', updateOnlineStatus);
-            updateOnlineStatus();
+            const updateStatus = () => { offlineIndicator.style.display = navigator.onLine ? 'none' : 'block'; };
+            window.addEventListener('online', updateStatus); window.addEventListener('offline', updateStatus);
+            updateStatus();
 
-            // Search
-            const searchInput = document.getElementById('search-input');
-            const searchResults = document.getElementById('search-results');
-            const searchClear = document.getElementById('search-clear');
-
-            searchClear.addEventListener('click', () => {
-                searchInput.value = '';
-                searchClear.style.display = 'none';
-                searchResults.style.display = 'none';
-                searchInput.focus();
-            });
-
-            searchInput.addEventListener('input', (e) => {
-                const rawQuery = e.target.value;
-                searchClear.style.display = rawQuery.length > 0 ? 'flex' : 'none';
-                
-                const query = rawQuery.toLowerCase().replace(/[^a-z0-9]/g, '');
-                searchResults.innerHTML = '';
-                
-                if (query.length < 2) { 
-                    searchResults.style.display = 'none'; 
-                    return; 
-                }
-
-                const matches = campusData.buildings.filter(b => {
-                    const bName = b.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const bType = (b.type || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const hasAliasMatch = b.aliases && b.aliases.some(a => a.toLowerCase().replace(/[^a-z0-9]/g, '').includes(query));
-                    return bName.includes(query) || hasAliasMatch || bType.includes(query);
-                }).slice(0, 10);
-
-                searchResults.style.display = 'block';
-                
-                if (matches.length > 0) {
-                    searchResults.style.display = 'block';
-                    matches.forEach(match => {
-                        const div = document.createElement('div');
-                        div.className = 'search-result-item';
-                        
-                        let type = match.type || 'POI';
-                        let icon = '📍';
-                        if (type.includes('lib')) icon = '📚';
-                        else if (type.includes('cafe') || type.includes('food')) icon = '☕';
-                        else if (type.includes('hostel') || type.includes('dorm')) icon = '🏠';
-                        else if (type.includes('dept') || type.includes('academic')) icon = '🎓';
-                        else if (type.includes('sport') || type.includes('gym')) icon = '⚽';
-
-                        let displayType = type.replace(/_/g, ' ').replace('yes', 'Building');
-
-                        div.innerHTML = `
-                            <div class="search-icon-wrapper">${icon}</div>
-                            <div style="flex:1;">
-                                <strong style="display:block; font-size:16px;">${match.name}</strong>
-                                <small class="text-muted" style="text-transform:capitalize; font-size:12px; font-weight:600;">${displayType}</small>
-                            </div>`;
-                        
-                        div.addEventListener('click', () => {
-                            searchInput.value = match.name;
-                            searchResults.style.display = 'none';
-                            searchInput.blur();
-                            setDestination([match.lat, match.lon], match.name);
-                        });
-                        searchResults.appendChild(div);
-                    });
-                } else {
-                    searchResults.innerHTML = `<div style="padding:24px; text-align:center;" class="text-muted text-sm">No locations found matching "${rawQuery}"</div>`;
-                }
-            });
-
-            map.on('click', () => { searchResults.style.display = 'none'; searchInput.blur(); });
+            const searchInput = document.getElementById('search-input'), results = document.getElementById('search-results'), clear = document.getElementById('search-clear');
             
-            document.getElementById('alt-route-btn').addEventListener('click', () => {
-                if (currentPathIds.length > 1) {
-                    let nodeToBlock = currentPathIds[1];
-                    if (typeof nodeToBlock === 'string' && nodeToBlock.startsWith('b_')) {
-                        showToast("You are almost there. No alternate route needed.");
-                        return;
-                    }
-
-                    blockedNodeIds.add(nodeToBlock);
-                    
-                    if (userLocation && currentDestination) {
-                        const startNodes = getNearestNodes(userLocation[0], userLocation[1], 5);
-                        const endNodes = getNearestNodes(currentDestination[0], currentDestination[1], 5);
-                        let hasAlternate = false;
-                        for (const sId of startNodes) {
-                            for (const eId of endNodes) {
-                                if (dijkstra(sId, eId, blockedNodeIds)) {
-                                    hasAlternate = true;
-                                    break;
-                                }
-                            }
-                            if (hasAlternate) break;
-                        }
-
-                        if (hasAlternate) {
-                            calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
-                        } else {
-                            blockedNodeIds.delete(nodeToBlock);
-                            showToast("No alternate route found.");
-                        }
-                    }
-                } else {
-                    showToast("No alternate route available.");
-                }
+            searchInput.addEventListener('input', (e) => {
+                const raw = e.target.value;
+                const q = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+                results.innerHTML = '';
+                if (q.length < 2) { results.style.display = 'none'; return; }
+                const matches = campusData.buildings.filter(b => {
+                    const name = b.name.toLowerCase().replace(/[^a-z0-9]/g, ''), type = (b.type || '').toLowerCase();
+                    return name.includes(q) || type.includes(q) || (b.aliases && b.aliases.some(a => a.toLowerCase().includes(q)));
+                }).slice(0, 10);
+                
+                results.style.display = 'block';
+                if (matches.length > 0) {
+                    matches.forEach(m => {
+                        const div = document.createElement('div');
+                        div.className = 'result-item';
+                        let icon = '📍';
+                        if (m.type.includes('food') || m.type.includes('cafe')) icon = '☕';
+                        else if (m.type.includes('lib')) icon = '📚';
+                        else if (m.type.includes('hostel')) icon = '🏠';
+                        div.innerHTML = `<span style="font-size:18px;">${icon}</span><div style="flex:1;"><strong style="display:block; font-size:15px;">${m.name}</strong><small class="text-muted" style="text-transform:capitalize;">${m.type.replace(/_/g,' ')}</small></div>`;
+                        div.onclick = () => { searchInput.value = m.name; results.style.display = 'none'; setDestination([m.lat, m.lon], m.name); };
+                        results.appendChild(div);
+                    });
+                } else { results.innerHTML = '<div style="padding:20px; text-align:center;" class="text-muted">No results found</div>'; }
             });
 
-            document.getElementById('cancel-route-btn').addEventListener('click', () => {
+            map.on('click', () => { results.style.display = 'none'; searchInput.blur(); });
+
+            document.getElementById('alt-route-btn').onclick = async () => {
+                if (isCalculatingRoute) return;
+                if (currentPathIds.length < 2) { showToast("No alternate available"); return; }
+                
+                isCalculatingRoute = true;
+                const nodeToBlock = currentPathIds[1];
+                if (typeof nodeToBlock === 'string' && nodeToBlock.startsWith('b_')) { showToast("Destination reached soon"); isCalculatingRoute = false; return; }
+                
+                blockedNodeIds.add(nodeToBlock);
+                const hasAlt = await tryFindAlternate();
+                
+                if (hasAlt) {
+                    calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                } else {
+                    blockedNodeIds.delete(nodeToBlock);
+                    if (blockedNodeIds.size > 0) {
+                        showToast("Resetting routes...");
+                        blockedNodeIds.clear();
+                        calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                    } else {
+                        showToast("No more alternate routes");
+                    }
+                }
+                isCalculatingRoute = false;
+            };
+
+            async function tryFindAlternate() {
+                const startNodes = getNearestNodes(userLocation[0], userLocation[1], 3);
+                const endNodes = getNearestNodes(currentDestination[0], currentDestination[1], 1);
+                for (const s of startNodes) {
+                    for (const e of endNodes) {
+                        if (dijkstra(s, e, blockedNodeIds)) return true;
+                    }
+                }
+                return false;
+            }
+
+            document.getElementById('cancel-route-btn').onclick = () => {
                 if (currentRoutePolyline) map.removeLayer(currentRoutePolyline);
                 if (destinationMarker) map.removeLayer(destinationMarker);
-                currentDestination = null;
-                blockedNodeIds.clear();
+                currentDestination = null; blockedNodeIds.clear();
                 document.getElementById('route-card').style.transform = 'translateY(100%)';
                 document.getElementById('bottom-hud').style.bottom = 'max(24px, env(safe-area-inset-bottom, 24px))';
                 document.getElementById('nav-banner').style.display = 'none';
-                currentRoutePath = []; currentPathIds = []; isFollowing = false;
-                if (userLocation) map.setView(userLocation, 17);
-            });
+                currentPathIds = []; currentRoutePath = []; isFollowing = false;
+                updateGPSUI();
+                if (userLocation) map.flyTo(userLocation, 17);
+            };
         }
 
-        const blueDotIcon = L.divIcon({
-            className: 'user-location-icon',
-            html: `
-                <div id="user-dot-root" style="position:relative; width:40px; height:40px;">
-                    <div id="user-arrow" style="position:absolute; top:-2px; left:50%; margin-left:-12px; transform-origin: center 22px; transition: transform 0.3s ease; display:none; z-index:0;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--primary)" opacity="0.7">
-                            <path d="M12 2L22 22L12 18L2 22Z" />
-                        </svg>
-                    </div>
-                    <div style="position:absolute; top:9px; left:9px; width:16px; height:16px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79, 70, 229, 0.3), 0 2px 6px rgba(0,0,0,0.3); z-index:1;"></div>
-                </div>`,
-            iconSize: [40, 40],
-            iconAnchor: [20, 20]
-        });
+        const blueDotIcon = L.divIcon({ className: 'user-dot', html: `<div style="position:relative; width:40px; height:40px;"><div id="user-arrow" style="position:absolute; top:-2px; left:50%; margin-left:-12px; transform-origin: center 22px; transition: transform 0.3s; display:none;"><svg width="24" height="24" viewBox="0 0 24 24" fill="var(--primary)" opacity="0.8"><path d="M12 2L22 22L12 18L2 22Z"/></svg></div><div style="position:absolute; top:12px; left:12px; width:16px; height:16px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79,70,229,0.3);"></div></div>`, iconSize: [40, 40], iconAnchor: [20, 20] });
 
         function updateGPSUI() {
-            const gpsIcon = document.getElementById('gps-icon');
-            const gpsBtn = document.getElementById('gps-button');
-            if (isFollowing) {
-                gpsIcon.style.stroke = 'var(--primary)';
-                gpsBtn.style.background = 'var(--bg-glass)';
-                gpsBtn.style.boxShadow = '0 0 15px var(--primary-light)';
-            } else {
-                gpsIcon.style.stroke = 'var(--text-muted)';
-                gpsBtn.style.background = 'var(--bg-glass)';
-                gpsBtn.style.boxShadow = 'var(--shadow)';
-            }
+            const btn = document.getElementById('gps-button'), icon = document.getElementById('gps-icon');
+            if (isFollowing) btn.classList.add('active'); else btn.classList.remove('active');
         }
 
         function setupGeolocation() {
-            const gpsLocating = document.getElementById('gps-locating');
             const gpsBtn = document.getElementById('gps-button');
-            
-            const handlePosition = (position, isExplicitRequest = false) => {
-                const lat = position.coords.latitude, lon = position.coords.longitude;
-                
-                if (lastLoc) {
-                    const movedDist = getDistance(lastLoc[0], lastLoc[1], lat, lon);
-                    if (movedDist > 2) userHeading = getBearing(lastLoc[0], lastLoc[1], lat, lon);
-                }
+            const handlePos = (pos) => {
+                const lat = pos.coords.latitude, lon = pos.coords.longitude;
+                if (lastLoc) if (getDistance(lastLoc[0], lastLoc[1], lat, lon) > 2) userHeading = getBearing(lastLoc[0], lastLoc[1], lat, lon);
                 lastLoc = [lat, lon];
-
-                if (campusBounds && !campusBounds.contains([lat, lon])) {
-                    if (isExplicitRequest) {
-                        gpsLocating.style.display = 'none';
-                        showToast("Invalid Location: You are outside the campus.");
-                    }
-                    return;
-                }
-
-                gpsLocating.style.display = 'none';
+                if (campusBounds && !campusBounds.contains([lat, lon])) return;
                 userLocation = [lat, lon];
-                
-                if (!userMarker) {
-                    userMarker = L.marker(userLocation, { icon: blueDotIcon }).addTo(map);
-                    if (firstPos || isExplicitRequest) map.setView(userLocation, 18);
-                } else {
-                    userMarker.setLatLng(userLocation);
-                    if (isFollowing) map.panTo(userLocation, { animate: true });
-                    else if (firstPos) map.setView(userLocation, 18);
-                }
-                
+                if (!userMarker) { userMarker = L.marker(userLocation, { icon: blueDotIcon }).addTo(map); if (firstPos) map.setView(userLocation, 18); }
+                else { userMarker.setLatLng(userLocation); if (isFollowing) map.panTo(userLocation); }
                 firstPos = false;
-                updateGPSUI();
-                
                 if (currentDestination) {
-                    if (currentRoutePath.length === 0) {
-                        calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName || "Destination");
-                    } else {
-                        let minDistToRoute = Infinity;
-                        let closestIdx = 0;
-                        for (let i = 0; i < currentRoutePath.length - 1; i++) {
-                            const d = getDistanceToSegment(lat, lon, currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
-                            if (d < minDistToRoute) { minDistToRoute = d; closestIdx = i; }
-                        }
-                        
-                        if (minDistToRoute > 20) {
-                            calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName || "Destination");
-                        } else {
-                            // Trim the path
-                            if (closestIdx > 0) currentPathIds = currentPathIds.slice(closestIdx);
-                            const newPath = [[lat, lon]];
-                            for (let i = closestIdx + 1; i < currentRoutePath.length; i++) {
-                                newPath.push(currentRoutePath[i]);
-                            }
-                            currentRoutePath = newPath;
-                            currentRoutePolyline.setLatLngs(currentRoutePath);
-                            updateNavBanner(lat, lon);
-                        }
+                    if (currentRoutePath.length === 0) calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                    else {
+                        let minDist = Infinity;
+                        for (let i = 0; i < currentRoutePath.length - 1; i++) minDist = Math.min(minDist, getDistanceToSegment(lat, lon, currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]));
+                        if (minDist > 20) calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                        else updateNavBanner(lat, lon);
                     }
                 }
             };
-
-            const startGps = (isInitialLoad = false) => {
-                if (navigator.geolocation) {
-                    if (!isInitialLoad) gpsLocating.style.display = 'flex';
-                    if (watchId) navigator.geolocation.clearWatch(watchId);
-                    watchId = navigator.geolocation.watchPosition(
-                        pos => handlePosition(pos, !isInitialLoad),
-                        err => {
-                            if (!isInitialLoad) {
-                                gpsLocating.style.display = 'none';
-                                if (err.code !== 3) showToast("Unable to access GPS location.");
-                            }
-                        },
-                        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-                    );
-                } else if (!isInitialLoad) showToast("Geolocation is not supported.");
+            
+            const start = () => navigator.geolocation.watchPosition(handlePos, (e) => { if (e.code !== 3) showToast("GPS error"); }, { enableHighAccuracy: true, maximumAge: 0 });
+            watchId = start();
+            gpsBtn.onclick = () => { 
+                isFollowing = true; updateGPSUI(); 
+                if (userLocation) map.flyTo(userLocation, 18);
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission().then(s => { if (s==='granted') window.addEventListener('deviceorientationabsolute', onOrient, true); });
+                else window.addEventListener('deviceorientationabsolute', onOrient, true);
             };
-
-            gpsBtn.addEventListener('click', () => {
-                startCompass();
-                gpsBtn.style.transform = 'scale(0.9)';
-                setTimeout(() => gpsBtn.style.transform = 'scale(1)', 200);
-                isFollowing = true;
-                if (userLocation) map.flyTo(userLocation, 18, { animate: true, duration: 1 });
-                startGps(false);
-                updateGPSUI();
-            });
-
-            startGps(true);
         }
 
-        // Compass / Orientation Logic
-        function applyHeading(degrees) {
-            const arrowEl = document.getElementById('user-arrow');
-            if (arrowEl) { arrowEl.style.transform = `rotate(${degrees}deg)`; arrowEl.style.display = 'block'; }
-        }
-        function startCompass() {
-            if (typeof DeviceOrientationEvent !== 'undefined') {
-                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    DeviceOrientationEvent.requestPermission().then(state => { if (state === 'granted') listenOrientation(); }).catch(console.warn);
-                } else { listenOrientation(); }
-            }
-        }
-        function listenOrientation() {
-            window.addEventListener('deviceorientationabsolute', onOrient, true);
-            window.addEventListener('deviceorientation', onOrient, true);
-        }
         function onOrient(e) {
-            let heading = null;
-            if (e.webkitCompassHeading !== undefined) heading = e.webkitCompassHeading;
-            else if (e.absolute && e.alpha !== null) heading = (360 - e.alpha) % 360;
-            if (heading !== null) applyHeading(Math.round(heading));
+            let h = e.webkitCompassHeading !== undefined ? e.webkitCompassHeading : (e.absolute && e.alpha !== null ? (360 - e.alpha) % 360 : null);
+            if (h !== null) { const el = document.getElementById('user-arrow'); el.style.transform = `rotate(${h}deg)`; el.style.display = 'block'; }
         }
 
-        // Navigation Logic
-        function getNearestNodes(lat, lon, count) {
-            let nodes = [];
-            for (const [id, coord] of Object.entries(campusData.graph.nodes)) {
-                nodes.push({id, dist: getDistance(lat, lon, coord[1], coord[0])});
-            }
-            nodes.sort((a, b) => a.dist - b.dist);
-            return nodes.slice(0, count).map(n => n.id);
-        }
+        function getNearestNodes(lat, lon, count) { let n = []; for (const [id, c] of Object.entries(campusData.graph.nodes)) n.push({id, d: getDistance(lat, lon, c[1], c[0])}); return n.sort((a,b)=>a.d-b.d).slice(0, count).map(x=>x.id); }
 
-        function snapToNearestNode(lat, lon) {
-            return getNearestNodes(lat, lon, 1)[0];
-        }
-
-        function dijkstra(startId, endId, blockedNodes = new Set()) {
-            const graph = campusData.graph.edges;
-            const distances = {}, previous = {}, pq = new PriorityQueue();
-            for (const node in campusData.graph.nodes) { distances[node] = Infinity; previous[node] = null; }
-            if (!distances.hasOwnProperty(startId)) return null;
-            distances[startId] = 0; pq.enqueue(startId, 0);
+        function dijkstra(startId, endId, blocked = new Set()) {
+            const graph = campusData.graph.edges, dists = {}, prev = {}, pq = new PriorityQueue();
+            for (const n in campusData.graph.nodes) { dists[n] = Infinity; prev[n] = null; }
+            if (!(startId in dists)) return null;
+            dists[startId] = 0; pq.enqueue(startId, 0);
             while (!pq.isEmpty()) {
-                const curr = pq.dequeue();
-                if (curr === endId) break;
-                if (graph[curr]) {
-                    for (const neighbor in graph[curr]) {
-                        if (blockedNodes.has(neighbor)) continue;
-                        const newDist = distances[curr] + graph[curr][neighbor];
-                        if (newDist < distances[neighbor]) {
-                            distances[neighbor] = newDist; previous[neighbor] = curr; pq.enqueue(neighbor, newDist);
-                        }
-                    }
-                }
+                const u = pq.dequeue(); if (u === endId) break;
+                if (graph[u]) for (const v in graph[u]) { if (blocked.has(v)) continue; const d = dists[u] + graph[u][v]; if (d < dists[v]) { dists[v] = d; prev[v] = u; pq.enqueue(v, d); } }
             }
-            const path = []; let c = endId;
-            while (c !== null) { path.unshift(c); c = previous[c]; }
-            return path[0] === startId ? path : null;
+            const p = []; let curr = endId; while (curr) { p.unshift(curr); curr = prev[curr]; }
+            return p[0] === startId ? p : null;
         }
 
         function setDestination(latLng, name) {
-            currentDestination = latLng; currentDestinationName = name;
-            blockedNodeIds.clear();
+            currentDestination = latLng; currentDestinationName = name; blockedNodeIds.clear();
             if (destinationMarker) map.removeLayer(destinationMarker);
-            destinationMarker = L.marker(latLng, { icon: L.divIcon({ className: 'dest-marker', html: '<div style="font-size:32px; margin-top:-32px; margin-left:-16px;">🎯</div>', iconSize: [32, 32] }) }).addTo(map);
-            map.setView(latLng, 16);
+            destinationMarker = L.marker(latLng, { icon: L.divIcon({ className: 'dest', html: '<div style="font-size:32px; transform:translate(-50%,-100%);">🎯</div>' }) }).addTo(map);
+            map.flyTo(latLng, 17);
             if (userLocation) calculateAndDrawRoute(userLocation, latLng, name);
-            else showToast("Enable GPS to get directions.");
+            else showToast("Awaiting GPS...");
         }
 
         function calculateAndDrawRoute(start, end, name) {
             if (currentRoutePolyline) map.removeLayer(currentRoutePolyline);
-            
-            const startNodes = getNearestNodes(start[0], start[1], 5);
-            const endNodes = getNearestNodes(end[0], end[1], 5);
-            
-            let pathIds = null;
-            for (const sId of startNodes) {
-                for (const eId of endNodes) {
-                    pathIds = dijkstra(sId, eId, blockedNodeIds);
-                    if (pathIds) break;
-                }
-                if (pathIds) break;
-            }
-
-            if (pathIds) {
-                currentPathIds = pathIds;
-                const latLngs = pathIds.map(id => [campusData.graph.nodes[id][1], campusData.graph.nodes[id][0]]);
-                latLngs.unshift(start); latLngs.push(end);
-                currentRoutePath = latLngs;
-                currentRoutePolyline = L.polyline(latLngs, { 
-                    color: '#4F46E5', weight: 7, opacity: 0.9, dashArray: '15, 15', 
-                    className: 'route-path-animated' 
-                }).addTo(map);
-                
-                if (!isFollowing) map.fitBounds(currentRoutePolyline.getBounds(), { padding: [50, 50] });
-                let dist = 0; for(let i=0; i<latLngs.length-1; i++) dist += getDistance(latLngs[i][0], latLngs[i][1], latLngs[i+1][0], latLngs[i+1][1]);
-                document.getElementById('route-dest-name').innerText = name;
-                document.getElementById('route-distance').innerText = `Distance: ~${Math.round(dist)}m • ${Math.ceil(dist/80)} min walk`;
-                isFollowing = true;
+            const sNodes = getNearestNodes(start[0], start[1], 5), eNodes = getNearestNodes(end[0], end[1], 1);
+            let pIds = null; for (const s of sNodes) { for (const e of eNodes) { pIds = dijkstra(s, e, blockedNodeIds); if (pIds) break; } if (pIds) break; }
+            if (pIds) {
+                currentPathIds = pIds; const lls = pIds.map(id => [campusData.graph.nodes[id][1], campusData.graph.nodes[id][0]]);
+                lls.unshift(start); lls.push(end); currentRoutePath = lls;
+                currentRoutePolyline = L.polyline(lls, { color: 'var(--primary)', weight: 6, opacity: 0.9, dashArray: '12, 12', className: 'route-path-animated' }).addTo(map);
+                let d = 0; for (let i=0; i<lls.length-1; i++) d += getDistance(lls[i][0], lls[i][1], lls[i+1][0], lls[i+1][1]);
+                document.getElementById('route-dest-name').textContent = name;
+                document.getElementById('route-distance').textContent = `${Math.round(d)}m • ${Math.ceil(d/80)} min walk`;
                 document.getElementById('route-card').style.transform = 'translateY(0)';
-                document.getElementById('bottom-hud').style.bottom = 'calc(max(20px, env(safe-area-inset-bottom, 20px)) + 190px)';
-                updateGPSUI();
-            } else { 
-                currentPathIds = [];
-                currentRoutePath = [];
-                showToast("No route found!"); 
-            }
+                document.getElementById('bottom-hud').style.bottom = 'calc(max(24px, env(safe-area-inset-bottom, 24px)) + 190px)';
+                isFollowing = true; updateGPSUI();
+            } else { showToast("Route error"); }
         }
 
         function updateNavBanner(lat, lon) {
             if (currentRoutePath.length < 2) return;
-            
-            const dest = currentRoutePath[currentRoutePath.length - 1];
-            const distToDest = getDistance(lat, lon, dest[0], dest[1]);
-            if (distToDest < 15) {
-                document.getElementById('nav-arrow').textContent = '🎯';
-                document.getElementById('nav-instruction').textContent = 'You have arrived!';
-                document.getElementById('nav-distance').textContent = 'Destination reached';
-                document.getElementById('nav-banner').style.display = 'flex';
-                return;
-            }
-            
-            let currentBearing = getBearing(lat, lon, currentRoutePath[1][0], currentRoutePath[1][1]);
-            
-            // Wrong way check
-            if (userHeading !== null && lastLoc) {
-                let diff = currentBearing - userHeading;
-                if (diff > 180) diff -= 360; if (diff < -180) diff += 360;
-                if (Math.abs(diff) > 135) {
-                    document.getElementById('nav-arrow').textContent = '↩️';
-                    document.getElementById('nav-instruction').textContent = 'Turn around';
-                    document.getElementById('nav-distance').textContent = 'Walking wrong way';
-                    document.getElementById('nav-banner').style.display = 'flex';
-                    return;
-                }
-            }
-
-            let turnInstr = { icon: '⬆️', text: 'Continue straight' }, found = false;
-            let distToTurn = getDistance(lat, lon, currentRoutePath[1][0], currentRoutePath[1][1]);
-            
-            for (let i = 1; i < currentRoutePath.length - 1; i++) {
-                const nextB = getBearing(currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
-                let diff = nextB - currentBearing;
-                if (diff > 180) diff -= 360; if (diff < -180) diff += 360;
-                
-                if (Math.abs(diff) > 25) { 
-                    turnInstr = getTurnInstruction(diff); 
-                    found = true; 
-                    break; 
-                }
-                currentBearing = nextB;
-                distToTurn += getDistance(currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
-                if (distToTurn > 200) break;
-            }
-            
-            const d = found ? distToTurn : distToDest;
-            document.getElementById('nav-arrow').textContent = turnInstr.icon;
-            document.getElementById('nav-instruction').textContent = turnInstr.text;
-            document.getElementById('nav-distance').textContent = (found && d > 10 ? 'In ' : '') + formatDistance(d);
+            const dest = currentRoutePath[currentRoutePath.length - 1], dToD = getDistance(lat, lon, dest[0], dest[1]);
+            if (dToD < 15) { document.getElementById('nav-arrow').textContent = '🎯'; document.getElementById('nav-instruction').textContent = 'Arrived!'; document.getElementById('nav-banner').style.display = 'flex'; return; }
+            document.getElementById('nav-instruction').textContent = 'Follow path';
+            document.getElementById('nav-distance').textContent = Math.round(dToD) + 'm';
             document.getElementById('nav-banner').style.display = 'flex';
         }
 
-        // Helpers for Navigation
-        function getBearing(lat1, lon1, lat2, lon2) {
-            const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180, Δλ = (lon2 - lon1) * Math.PI / 180;
-            const y = Math.sin(Δλ) * Math.cos(φ2), x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-            return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-        }
-        function getTurnInstruction(diff) {
-            if (Math.abs(diff) < 25) return { icon: '⬆️', text: 'Continue straight' };
-            if (diff >= 25 && diff < 60) return { icon: '↗️', text: 'Slight right' };
-            if (diff >= 60 && diff < 120) return { icon: '➡️', text: 'Turn right' };
-            if (diff >= 120) return { icon: '↩️', text: 'Make a U-turn' };
-            if (diff <= -25 && diff > -60) return { icon: '↖️', text: 'Slight left' };
-            if (diff <= -60 && diff > -120) return { icon: '⬅️', text: 'Turn left' };
-            return { icon: '↪️', text: 'Make a U-turn' };
-        }
-        function formatDistance(m) { return m < 50 ? Math.round(m) + 'm' : (m < 1000 ? (Math.round(m/10)*10) + 'm' : (m/1000).toFixed(1) + 'km'); }
-        function getDistanceToSegment(px, py, x1, y1, x2, y2) {
-            const l2 = Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2);
-            if (l2 === 0) return getDistance(px, py, x1, y1);
-            let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
-            t = Math.max(0, Math.min(1, t));
-            return getDistance(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
-        }
-        function showToast(msg) {
-            const t = document.getElementById('toast'); t.innerText = msg; t.style.opacity = '1';
-            clearTimeout(toastTimeout); toastTimeout = setTimeout(() => { t.style.opacity = '0'; }, 3000);
-        }
+        function getBearing(la1, lo1, la2, lo2) { const f1 = la1 * Math.PI / 180, f2 = la2 * Math.PI / 180, dl = (lo2-lo1) * Math.PI / 180; const y = Math.sin(dl) * Math.cos(f2), x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; }
+        function getDistanceToSegment(px, py, x1, y1, x2, y2) { const l2 = Math.pow(x2-x1, 2) + Math.pow(y2-y1, 2); if (l2 === 0) return getDistance(px, py, x1, y1); let t = Math.max(0, Math.min(1, ((px-x1)*(x2-x1)+(py-y1)*(y2-y1))/l2)); return getDistance(px, py, x1+t*(x2-x1), y1+t*(y2-y1)); }
+        function showToast(m) { const t = document.getElementById('toast'); t.textContent = m; t.style.opacity = '1'; clearTimeout(toastTimeout); toastTimeout = setTimeout(() => t.style.opacity = '0', 3000); }
 
-        // SW Progress
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('message', e => {
                 if (e.data && e.data.type === 'TILE_CACHE_PROGRESS') {
-                    const bar = document.getElementById('tile-progress-bar'), fill = document.getElementById('tile-progress-fill'), pct = document.getElementById('tile-progress-pct');
-                    if (bar) { bar.style.display = 'flex'; fill.style.width = e.data.progress + '%'; pct.textContent = e.data.progress + '%'; if (e.data.progress >= 100) setTimeout(() => bar.style.display = 'none', 2000); }
+                    const el = document.getElementById('tile-progress-bar');
+                    if (el) { el.style.display = 'flex'; document.getElementById('tile-progress-pct').textContent = e.data.progress + '%'; if (e.data.progress >= 100) setTimeout(() => el.style.display = 'none', 2000); }
                 }
             });
         }
-
         loadApp();
     </script>
 </body>

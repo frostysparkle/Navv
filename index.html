@@ -38,39 +38,55 @@
             --primary-light: #818CF8;
             --bg-glass: rgba(255, 255, 255, 0.85);
             --bg-glass-dark: rgba(30, 30, 36, 0.85);
-            --border-glass: 1px solid rgba(255, 255, 255, 0.4);
-            --border-glass-dark: 1px solid rgba(255, 255, 255, 0.1);
+            --border-glass: 1px solid rgba(0, 0, 0, 0.1);
+            --text-main: #111;
+            --text-muted: #666;
             --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-            --shadow-dark: 0 8px 32px rgba(0, 0, 0, 0.25);
             --radius: 16px;
             --blur: blur(16px);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-glass: rgba(30, 30, 36, 0.85);
+                --border-glass: 1px solid rgba(255, 255, 255, 0.1);
+                --text-main: #eee;
+                --text-muted: #aaa;
+                --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            }
         }
 
         body { 
             margin: 0; padding: 0; 
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             background: #000; 
+            color: var(--text-main);
             -webkit-tap-highlight-color: transparent; 
         }
-        #map { height: 100vh; width: 100vw; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Loading Overlay */
-        #loading {
+        /* Layout Containers */
+        .ui-top-stack {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #fff; z-index: 9999;
+            top: env(safe-area-inset-top, 20px);
+            left: 0; width: 100%;
             display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            transition: opacity 0.5s ease;
+            align-items: center; gap: 10px;
+            z-index: 2000;
+            pointer-events: none;
         }
-        .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .ui-top-stack > * { pointer-events: auto; }
+
+        .ui-bottom-stack {
+            position: fixed;
+            bottom: max(20px, env(safe-area-inset-bottom, 20px));
+            left: 50%; transform: translateX(-50%);
+            width: 92%; max-width: 420px;
+            display: flex; flex-direction: column;
+            align-items: stretch; gap: 12px;
+            z-index: 1000;
+            transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* Generic Glass Classes */
         .glass-panel {
@@ -80,101 +96,87 @@
             border: var(--border-glass);
             box-shadow: var(--shadow);
             border-radius: var(--radius);
+            color: var(--text-main);
         }
 
-        .glass-panel-dark {
-            background: var(--bg-glass-dark);
-            backdrop-filter: var(--blur);
-            -webkit-backdrop-filter: var(--blur);
-            border: var(--border-glass-dark);
-            box-shadow: var(--shadow-dark);
-            color: white;
+        /* Map Animations */
+        @keyframes marching-ants {
+            from { stroke-dashoffset: 20; }
+            to { stroke-dashoffset: 0; }
+        }
+        .route-path-animated {
+            animation: marching-ants 1s linear infinite;
         }
     </style>
 </head>
 <body>
-    <div id="loading">
+    <div id="loading" aria-hidden="true">
         <div class="spinner"></div>
         <p style="margin-top:15px; color:#555; font-weight:bold;">Loading Navv...</p>
     </div>
 
     <div id="map"></div>
     
-    <!-- Offline Indicator -->
-    <div id="offline-indicator" style="position: absolute; top: max(75px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 1000; background: #EF4444; color: white; padding: 10px 24px; border-radius: 100px; font-size: 14px; font-weight: 700; box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4); display: none; transition: opacity 0.3s; white-space: nowrap; letter-spacing: -0.2px;">
-        ⚠️ Offline Mode Active
-    </div>
-
-    <!-- GPS Locating Indicator -->
-    <div id="gps-locating" class="glass-panel-dark" style="position: absolute; bottom: max(100px, env(safe-area-inset-bottom)); right: 20px; z-index: 1000; padding: 12px 24px; border-radius: 100px; font-size: 14px; font-weight: 600; display: none; align-items: center; gap: 12px; transition: opacity 0.3s;">
-        <div style="width: 16px; height: 16px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-        Locating GPS...
-    </div>
-
-    <!-- Search UI -->
-    <div id="search-container" style="position: absolute; top: max(15px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 1000; width: 92%; max-width: 420px;">
-        <div class="glass-panel" style="position: relative; overflow: hidden;">
-            <input type="text" id="search-input" placeholder="Search campus (e.g., Library, Cafe)..." style="width: 100%; padding: 18px 24px; font-size: 16px; border: none; background: transparent; box-sizing: border-box; outline: none; transition: all 0.3s; font-family: inherit; font-weight: 600; color: #111;">
+    <!-- Top HUD: Notifications & Info -->
+    <div class="ui-top-stack">
+        <div id="offline-indicator" style="background: #EF4444; color: white; padding: 10px 24px; border-radius: 100px; font-size: 14px; font-weight: 700; display: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);">
+            ⚠️ Offline Mode Active
         </div>
-        <div id="search-results" class="glass-panel" style="margin-top: 10px; max-height: 300px; overflow-y: auto; display: none;"></div>
-    </div>
-    
-    <!-- GPS Button -->
-    <div id="gps-button" class="glass-panel" style="position: absolute; bottom: max(30px, env(safe-area-inset-bottom)); right: 20px; z-index: 1000; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s; border: var(--border-glass);">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
-    </div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="glass-panel-dark" style="position: absolute; top: -100px; left: 50%; transform: translateX(-50%); z-index: 2000; padding: 14px 28px; border-radius: 100px; font-size: 14px; font-weight: 700; transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); pointer-events: none; white-space: nowrap; letter-spacing: -0.2px;">
-        Notification
-    </div>
-
-    <!-- Map Tile Download Progress -->
-    <div id="tile-progress-bar" class="glass-panel-dark" style="position: fixed; top: auto; bottom: 24px; left: 50%; transform: translateX(-50%); width: auto; min-width: 240px; max-width: 90%; z-index: 3000; display: none; flex-direction: column; align-items: stretch; padding: 10px 20px; gap: 8px; border-radius: 100px;">
-        <div style="display:flex; justify-content:space-between; width:100%; align-items: center;">
-            <span style="font-size:12px; font-weight:700; color:rgba(255,255,255,0.9); display: flex; align-items: center; gap: 8px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-light);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Caching Navv...
-            </span>
-            <span id="tile-progress-pct" style="font-size:12px; font-weight:800; color:var(--primary-light); margin-left: 12px;">0%</span>
+        <div id="toast" class="glass-panel" style="padding: 14px 28px; border-radius: 100px; font-size: 14px; font-weight: 700; opacity: 0; transition: opacity 0.3s; background: #333; color: #fff;">
+            Notification
         </div>
-        <div style="width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
-            <div id="tile-progress-fill" style="height:100%; width:0%; background:linear-gradient(90deg, var(--primary), var(--primary-light)); border-radius:4px; transition:width 0.4s ease;"></div>
-        </div>
-    </div>
 
-    <!-- Bottom Route Card -->
-    <div id="route-card" class="glass-panel" style="position: absolute; bottom: 0; left: 0; width: 100%; z-index: 1500; border-radius: 28px 28px 0 0; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); padding-bottom: max(24px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; border-bottom: none;">
-        <div style="width: 44px; height: 5px; background: rgba(0,0,0,0.1); border-radius: 100px; margin: 14px auto;"></div>
-        <div style="padding: 0 24px;">
-            <h2 id="route-dest-name" style="margin: 0 0 6px 0; font-size: 24px; color: #111; font-weight: 800; letter-spacing: -0.6px;">Destination</h2>
-            <p id="route-distance" style="margin: 0 0 22px 0; font-size: 15px; color: #666; font-weight: 600;">Calculating...</p>
-            <div style="display:flex; gap:12px; width:100%;">
-                <button id="alt-route-btn" style="flex:1; padding: 18px; background: var(--primary); color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(79, 70, 229, 0.3); -webkit-tap-highlight-color: transparent;">Alternative</button>
-                <button id="cancel-route-btn" style="flex:1; padding: 18px; background: #EF4444; color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3); -webkit-tap-highlight-color: transparent;">End Route</button>
+        <div id="nav-banner" class="glass-panel" style="width: fit-content; min-width: 280px; padding: 12px 24px; border-radius: 100px; display: none; align-items: center; gap: 16px; background: rgba(0,0,0,0.8); color: white;">
+            <div id="nav-arrow" style="font-size: 32px; min-width: 40px; text-align: center;">⬆️</div>
+            <div style="flex: 1; min-width: 0;">
+                <div id="nav-distance" style="font-size: 11px; color: rgba(255,255,255,0.6); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">Calculating...</div>
+                <div id="nav-instruction" style="font-size: 16px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Getting route...</div>
             </div>
         </div>
     </div>
 
-    <!-- Turn-by-Turn Navigation Banner -->
-    <div id="nav-banner" class="glass-panel-dark" style="
-        position: absolute;
-        top: max(80px, calc(env(safe-area-inset-top) + 70px));
-        left: 50%; transform: translateX(-50%);
-        width: fit-content;
-        min-width: 280px;
-        z-index: 1200;
-        padding: 12px 24px;
-        border-radius: 100px;
-        display: none;
-        align-items: center;
-        gap: 16px;
-        transition: opacity 0.3s;
-    ">
-        <div id="nav-arrow" style="font-size: 42px; min-width: 48px; text-align: center; line-height: 1;">⬆️</div>
-        <div style="flex: 1; min-width: 0;">
-            <div id="nav-distance" style="font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 2px;">Calculating...</div>
-            <div id="nav-instruction" style="font-size: 18px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Getting route...</div>
+    <!-- Bottom HUD: Search & Controls -->
+    <div class="ui-bottom-stack" id="bottom-hud">
+        <!-- Minimal Tile Progress -->
+        <div id="tile-progress-bar" class="glass-panel" style="display: none; height: 32px; align-items: center; justify-content: center; padding: 0 15px; border-radius: 100px; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: -4px; box-shadow: none; border-bottom: none; border-bottom-left-radius: 0; border-bottom-right-radius: 0;">
+            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                <div style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; animation: pulse 1.5s infinite;"></div>
+                <span>Downloading Offline Maps...</span>
+            </div>
+            <span id="tile-progress-pct" style="color: var(--primary);">0%</span>
+            <div id="tile-progress-fill" style="position: absolute; bottom: 0; left: 0; height: 2px; width: 0%; background: var(--primary); transition: width 0.3s;"></div>
+        </div>
+
+        <div id="search-container" style="position: relative; width: 100%;">
+            <div class="glass-panel" style="position: relative; overflow: hidden; display: flex; align-items: center;">
+                <input type="text" id="search-input" placeholder="Search campus..." style="width: 100%; padding: 18px 24px; padding-right: 50px; font-size: 16px; border: none; background: transparent; outline: none; font-family: inherit; font-weight: 600; color: inherit;">
+                <button id="search-clear" style="position: absolute; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(0,0,0,0.1); color: var(--text-muted); display: none; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; font-weight: bold;">✕</button>
+            </div>
+            <div id="search-results" class="glass-panel" style="position: absolute; bottom: calc(100% + 10px); left: 0; width: 100%; max-height: 300px; overflow-y: auto; display: none;"></div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end;">
+            <div id="gps-button" class="glass-panel" role="button" aria-label="Find my location" tabindex="0" style="width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s;">
+                <svg id="gps-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- GPS Locating Indicator -->
+    <div id="gps-locating" class="glass-panel" style="position: fixed; bottom: 100px; right: 20px; z-index: 1000; padding: 10px 20px; border-radius: 100px; font-size: 13px; font-weight: 600; display: none; align-items: center; gap: 10px; background: rgba(0,0,0,0.7); color: white;">
+        <div style="width: 14px; height: 14px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        GPS...
+    </div>
+
+    <!-- Bottom Route Card -->
+    <div id="route-card" class="glass-panel" style="position: fixed; bottom: 0; left: 0; width: 100%; z-index: 1500; border-radius: 24px 24px 0 0; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); padding: 15px 24px max(24px, env(safe-area-inset-bottom)); box-sizing: border-box;">
+        <div style="width: 40px; height: 4px; background: rgba(0,0,0,0.1); border-radius: 10px; margin: 0 auto 15px;"></div>
+        <h2 id="route-dest-name" style="margin: 0 0 4px 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Destination</h2>
+        <p id="route-distance" style="margin: 0 0 20px 0; font-size: 14px; color: var(--text-muted); font-weight: 600;">Calculating...</p>
+        <div style="display:flex; gap:10px;">
+            <button id="alt-route-btn" style="flex:1; padding: 16px; background: var(--primary); color: white; border: none; border-radius: 14px; font-size: 15px; font-weight: 700;">Alternative</button>
+            <button id="cancel-route-btn" style="flex:1; padding: 16px; background: #EF4444; color: white; border: none; border-radius: 14px; font-size: 15px; font-weight: 700;">End Route</button>
         </div>
     </div>
 
@@ -478,30 +480,64 @@ out geom;`;
             // Search
             const searchInput = document.getElementById('search-input');
             const searchResults = document.getElementById('search-results');
+            const searchClear = document.getElementById('search-clear');
+
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
+                searchClear.style.display = 'none';
+                searchResults.style.display = 'none';
+                searchInput.focus();
+            });
+
             searchInput.addEventListener('input', (e) => {
                 const rawQuery = e.target.value;
+                searchClear.style.display = rawQuery.length > 0 ? 'flex' : 'none';
+                
                 const query = rawQuery.toLowerCase().replace(/[^a-z0-9]/g, '');
                 searchResults.innerHTML = '';
-                if (query.length < 2) { searchResults.style.display = 'none'; return; }
+                
+                if (query.length < 2) { 
+                    searchResults.style.display = 'none'; 
+                    return; 
+                }
+
                 const matches = campusData.buildings.filter(b => {
                     const bName = b.name.toLowerCase().replace(/[^a-z0-9]/g, '');
                     const bType = (b.type || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const hasAliasMatch = b.aliases && b.aliases.some(a => a.toLowerCase().replace(/[^a-z0-9]/g, '').includes(query));
                     return bName.includes(query) || hasAliasMatch || bType.includes(query);
-                }).slice(0, 8);
+                }).slice(0, 10);
+
+                searchResults.style.display = 'block';
+                
                 if (matches.length > 0) {
-                    searchResults.style.display = 'block';
                     matches.forEach(match => {
                         const div = document.createElement('div');
                         div.style.padding = '16px 20px';
                         div.style.borderBottom = '1px solid rgba(0,0,0,0.05)';
                         div.style.cursor = 'pointer';
+                        div.setAttribute('role', 'button');
+                        div.setAttribute('aria-label', `Navigate to ${match.name}`);
                         
-                        let displayType = match.type || 'Location';
-                        if (displayType === 'yes') displayType = 'Building';
-                        displayType = displayType.replace(/_/g, ' ');
+                        let type = match.type || 'POI';
+                        let icon = '📍';
+                        if (type.includes('lib')) icon = '📚';
+                        else if (type.includes('cafe') || type.includes('food')) icon = '☕';
+                        else if (type.includes('hostel') || type.includes('dorm')) icon = '🏠';
+                        else if (type.includes('dept') || type.includes('academic')) icon = '🎓';
+                        else if (type.includes('sport') || type.includes('gym')) icon = '⚽';
 
-                        div.innerHTML = `<strong style="color: #111; display: block; font-size: 16px;">${match.name}</strong><small style="color: #666; text-transform: capitalize; font-size: 13px; font-weight: 500;">${displayType}</small>`;
+                        let displayType = type.replace(/_/g, ' ').replace('yes', 'Building');
+
+                        div.innerHTML = `
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <span style="font-size:20px;">${icon}</span>
+                                <div style="flex:1;">
+                                    <strong style="color:var(--text-main); display:block; font-size:16px;">${match.name}</strong>
+                                    <small style="color:var(--text-muted); text-transform:capitalize; font-size:12px; font-weight:600;">${displayType}</small>
+                                </div>
+                            </div>`;
+                        
                         div.addEventListener('click', () => {
                             searchInput.value = match.name;
                             searchResults.style.display = 'none';
@@ -510,7 +546,9 @@ out geom;`;
                         });
                         searchResults.appendChild(div);
                     });
-                } else { searchResults.style.display = 'none'; }
+                } else {
+                    searchResults.innerHTML = `<div style="padding:24px; text-align:center; color:var(--text-muted); font-weight:600; font-size:14px;">No locations found matching "${rawQuery}"</div>`;
+                }
             });
 
             map.on('click', () => { searchResults.style.display = 'none'; searchInput.blur(); });
@@ -557,7 +595,7 @@ out geom;`;
                 currentDestination = null;
                 blockedNodeIds.clear();
                 document.getElementById('route-card').style.transform = 'translateY(100%)';
-                document.getElementById('gps-button').style.bottom = 'max(30px, env(safe-area-inset-bottom))';
+                document.getElementById('bottom-hud').style.bottom = 'max(20px, env(safe-area-inset-bottom, 20px))';
                 document.getElementById('nav-banner').style.display = 'none';
                 currentRoutePath = []; currentPathIds = []; isFollowing = false;
                 if (userLocation) map.setView(userLocation, 17);
@@ -578,6 +616,20 @@ out geom;`;
             iconSize: [40, 40],
             iconAnchor: [20, 20]
         });
+
+        function updateGPSUI() {
+            const gpsIcon = document.getElementById('gps-icon');
+            const gpsBtn = document.getElementById('gps-button');
+            if (isFollowing) {
+                gpsIcon.style.stroke = 'var(--primary)';
+                gpsBtn.style.background = 'var(--bg-glass)';
+                gpsBtn.style.boxShadow = '0 0 15px var(--primary-light)';
+            } else {
+                gpsIcon.style.stroke = 'var(--text-muted)';
+                gpsBtn.style.background = 'var(--bg-glass)';
+                gpsBtn.style.boxShadow = 'var(--shadow)';
+            }
+        }
 
         function setupGeolocation() {
             const gpsLocating = document.getElementById('gps-locating');
@@ -613,6 +665,7 @@ out geom;`;
                 }
                 
                 firstPos = false;
+                updateGPSUI();
                 
                 if (currentDestination) {
                     if (currentRoutePath.length === 0) {
@@ -666,6 +719,7 @@ out geom;`;
                 isFollowing = true;
                 if (userLocation) map.flyTo(userLocation, 18, { animate: true, duration: 1 });
                 startGps(false);
+                updateGPSUI();
             });
 
             startGps(true);
@@ -762,14 +816,19 @@ out geom;`;
                 const latLngs = pathIds.map(id => [campusData.graph.nodes[id][1], campusData.graph.nodes[id][0]]);
                 latLngs.unshift(start); latLngs.push(end);
                 currentRoutePath = latLngs;
-                currentRoutePolyline = L.polyline(latLngs, { color: '#4F46E5', weight: 6, opacity: 0.85, dashArray: '10, 10' }).addTo(map);
+                currentRoutePolyline = L.polyline(latLngs, { 
+                    color: '#4F46E5', weight: 7, opacity: 0.9, dashArray: '15, 15', 
+                    className: 'route-path-animated' 
+                }).addTo(map);
+                
                 if (!isFollowing) map.fitBounds(currentRoutePolyline.getBounds(), { padding: [50, 50] });
                 let dist = 0; for(let i=0; i<latLngs.length-1; i++) dist += getDistance(latLngs[i][0], latLngs[i][1], latLngs[i+1][0], latLngs[i+1][1]);
                 document.getElementById('route-dest-name').innerText = name;
                 document.getElementById('route-distance').innerText = `Distance: ~${Math.round(dist)}m • ${Math.ceil(dist/80)} min walk`;
                 isFollowing = true;
                 document.getElementById('route-card').style.transform = 'translateY(0)';
-                document.getElementById('gps-button').style.bottom = 'calc(max(30px, env(safe-area-inset-bottom)) + 180px)';
+                document.getElementById('bottom-hud').style.bottom = 'calc(max(20px, env(safe-area-inset-bottom, 20px)) + 190px)';
+                updateGPSUI();
             } else { 
                 currentPathIds = [];
                 currentRoutePath = [];
@@ -854,8 +913,8 @@ out geom;`;
             return getDistance(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
         }
         function showToast(msg) {
-            const t = document.getElementById('toast'); t.innerText = msg; t.style.top = 'max(20px, env(safe-area-inset-top))';
-            clearTimeout(toastTimeout); toastTimeout = setTimeout(() => { t.style.top = '-100px'; }, 3000);
+            const t = document.getElementById('toast'); t.innerText = msg; t.style.opacity = '1';
+            clearTimeout(toastTimeout); toastTimeout = setTimeout(() => { t.style.opacity = '0'; }, 3000);
         }
 
         // SW Progress

@@ -449,8 +449,11 @@ out geom;`;
             if (campusBoundaryCoords.length > 0) {
                 L.polygon([worldCoords, campusBoundaryCoords], { color: '#2c3e50', fillColor: '#000', fillOpacity: 0.7, weight: 3 }).addTo(map);
                 campusBounds = L.latLngBounds(campusBoundaryCoords);
-                map.setMaxBounds(campusBounds);
-                map.options.maxBoundsViscosity = 1.0;
+                // Expand the bounds by 50% to prevent jitter when zoomed out
+                const paddedBounds = campusBounds.pad(0.5);
+                map.setMaxBounds(paddedBounds);
+                // Lower viscosity creates an elastic 'bounce' instead of a hard stop
+                map.options.maxBoundsViscosity = 0.8;
             }
             
             map.whenReady(() => {

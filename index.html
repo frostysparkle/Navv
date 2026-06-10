@@ -550,7 +550,7 @@
 
         function onOrient(e) {
             let h = e.webkitCompassHeading !== undefined ? e.webkitCompassHeading : (e.absolute && e.alpha !== null ? (360 - e.alpha) % 360 : null);
-            if (h !== null) { const el = document.getElementById('user-arrow'); el.style.transform = `rotate(${h}deg)`; el.style.display = 'block'; }
+            if (h !== null) { const el = document.getElementById('user-arrow'); if (el) { el.style.transform = `rotate(${h}deg)`; el.style.display = 'block'; } }
         }
 
         function getNearestNodes(lat, lon, count) { let n = []; for (const [id, c] of Object.entries(campusData.graph.nodes)) n.push({id, d: getDistance(lat, lon, c[1], c[0])}); return n.sort((a,b)=>a.d-b.d).slice(0, count).map(x=>x.id); }
@@ -612,6 +612,13 @@
                 if (e.data && e.data.type === 'TILE_CACHE_PROGRESS') {
                     const el = document.getElementById('tile-progress-bar');
                     if (el) { el.style.display = 'flex'; document.getElementById('tile-progress-pct').textContent = e.data.progress + '%'; if (e.data.progress >= 100) setTimeout(() => el.style.display = 'none', 2000); }
+                }
+            });
+        }
+        loadApp();
+    </script>
+</body>
+</html>t').textContent = e.data.progress + '%'; if (e.data.progress >= 100) setTimeout(() => el.style.display = 'none', 2000); }
                 }
             });
         }

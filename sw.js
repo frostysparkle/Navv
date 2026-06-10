@@ -50,6 +50,7 @@ function getAllCampusTileUrls() {
 // ─── INSTALL: Cache app shell immediately, tiles deferred ────────────────────
 self.addEventListener('install', event => {
   console.log('[SW] Installing Navv Cache…');
+  // Single waitUntil call — spec only guarantees the first call is honoured
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       console.log('[SW] Caching Navv app shell');
@@ -64,12 +65,9 @@ self.addEventListener('install', event => {
       );
     }).then(() => {
       console.log('[SW] App shell cached, skipping waiting');
-      return self.skipWaiting();
+      self.skipWaiting();           // Take control immediately
+      cacheCampusTiles();           // Start tile pre-cache in background (non-blocking)
     })
-  );
-  // Start tile caching in background WITHOUT blocking install
-  event.waitUntil(
-    self.skipWaiting().then(() => cacheCampusTiles())
   );
 });
 
@@ -95,10 +93,8 @@ async function cacheCampusTiles() {
             cached++;
             return;
           }
-          const resp = await fetch(url, {
-            headers: { 'User-Agent': 'Navv/1.0' },
-            cache: 'no-store'
-          });
+          // No custom User-Agent — OSM tile servers may block non-browser UAs
+          const resp = await fetch(url, { cache: 'no-store' });
           if (resp.ok) {
             await cache.put(url, resp);
             cached++;
@@ -165,7 +161,8 @@ self.addEventListener('fetch', event => {
         if (cached) return cached;
         return fetch(event.request).then(resp => {
           if (resp.ok) {
-            caches.open(TILES_CACHE).then(c => c.put(event.request, resp.clone()));
+            const clone = resp.clone();
+            event.waitUntil(caches.open(TILES_CACHE).then(c => c.put(event.request, clone)));
           }
           return resp;
         }).catch(() => new Response('', { status: 404 }));
@@ -175,18 +172,19 @@ self.addEventListener('fetch', event => {
   }
 
   // 2. App shell (HTML navigation, Manifest) → Network-First
-  // This ensures users always get the latest version if online.
-  // We use { cache: 'no-cache' } to bypass the browser's HTTP cache (e.g. GitHub Pages 10min limit)
   if (event.request.mode === 'navigate' || url.pathname.endsWith('manifest.json')) {
     event.respondWith(
       fetch(event.request.url, { cache: 'no-cache' }).then(resp => {
         if (resp.ok) {
           const clone = resp.clone();
-          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+          event.waitUntil(caches.open(CACHE_NAME).then(c => c.put(event.request, clone)));
         }
         return resp;
       }).catch(() => {
-        return caches.match(event.request);
+        // If navigation fails (offline), try index.html specifically
+        return caches.match(event.request).then(match => {
+          return match || caches.match('./index.html');
+        });
       })
     );
     return;
@@ -197,10 +195,11 @@ self.addEventListener('fetch', event => {
     caches.match(event.request).then(cached => {
       const networkFetch = fetch(event.request).then(resp => {
         if (resp.ok) {
-          caches.open(CACHE_NAME).then(c => c.put(event.request, resp.clone()));
+          const clone = resp.clone();
+          event.waitUntil(caches.open(CACHE_NAME).then(c => c.put(event.request, clone)));
         }
         return resp;
-      }).catch(() => cached);
+      });
       return cached || networkFetch;
     })
   );

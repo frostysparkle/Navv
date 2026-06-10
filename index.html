@@ -574,21 +574,126 @@ out geom;`;
 
             clear.onclick = () => { searchInput.value = ''; clear.style.display = 'none'; results.style.display = 'none'; searchInput.focus(); };
 
+            // ── Modified BM25 Search Engine ─────────────────────────────────────
+            // Generates the initialism (first letter of each word) for a string.
+            // e.g. "Central Lecture Theatre" → "clt"
+            const makeInitialism = (str) =>
+                (str || '').toLowerCase().split(/\s+/).filter(Boolean).map(w => w[0]).join('');
+
+            // Tokenise a string into lowercase alpha-numeric tokens (also keeps original
+            // tokens for prefix matching).
+            const tokenise = (str) =>
+                (str || '').toLowerCase().match(/[a-z0-9]+/g) || [];
+
+            // Pre-build a per-building "document" for BM25 at search time.
+            // We enrich each building once with its auto-initialism and alias initialisms.
+            const enrichBuilding = (b) => {
+                if (b._bm25ready) return;
+                b._initialism = makeInitialism(b.name);
+                b._aliasInitialisms = (b.aliases || []).map(makeInitialism);
+                // Flatten all searchable text into one token list (name × 3 weight, type × 1, aliases × 2)
+                b._tokens = [
+                    ...tokenise(b.name), ...tokenise(b.name), ...tokenise(b.name),
+                    ...tokenise(b.type),
+                    ...(b.aliases || []).flatMap(a => [...tokenise(a), ...tokenise(a)])
+                ];
+                b._docLen = b._tokens.length;
+                b._bm25ready = true;
+            };
+
+            // BM25 parameters
+            const BM25_K1 = 1.5, BM25_B = 0.75;
+
+            // Score one building against the query tokens using BM25 TF + prefix bonus.
+            const bm25Score = (b, qTokens, avgDocLen, idfMap) => {
+                const freq = {};
+                for (const t of b._tokens) freq[t] = (freq[t] || 0) + 1;
+
+                let score = 0;
+                for (const qt of qTokens) {
+                    // Exact token match
+                    const tf = freq[qt] || 0;
+                    if (tf > 0) {
+                        const idf = idfMap.get(qt) || 1;
+                        const norm = tf * (BM25_K1 + 1) /
+                            (tf + BM25_K1 * (1 - BM25_B + BM25_B * b._docLen / avgDocLen));
+                        score += idf * norm;
+                    }
+                    // Prefix bonus: if any doc token starts with the query token (partial word)
+                    for (const t of Object.keys(freq)) {
+                        if (t !== qt && t.startsWith(qt)) {
+                            score += (idfMap.get(qt) || 0.5) * 0.4 * freq[t];
+                        }
+                    }
+                }
+                return score;
+            };
+
             searchInput.addEventListener('input', (e) => {
-                const raw = e.target.value;
-                const q = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const raw = e.target.value.trim();
+                const q = raw.toLowerCase();
                 clear.style.display = raw.length > 0 ? 'flex' : 'none';
                 results.innerHTML = '';
-                
+
                 if (q.length < 2) { results.style.display = 'none'; return; }
-                const matches = campusData.buildings.filter(b => {
-                    const name = (b.name || '').toLowerCase().replace(/[^a-z0-9]/g, ''), type = (b.type || '').toLowerCase();
-                    return name.includes(q) || type.includes(q) || (b.aliases && b.aliases.some(a => a.toLowerCase().includes(q)));
-                }).slice(0, 10);
-                
+
+                const buildings = campusData.buildings.filter(b => b.name);
+                buildings.forEach(enrichBuilding);
+
+                // Tokenise the query
+                const qTokens = tokenise(q);
+                // Also treat the raw stripped query as a possible initialism
+                const qRaw = q.replace(/\s+/g, '');
+                const looksLikeInitialism = /^[a-z]{2,6}$/.test(qRaw) && qTokens.length === 1;
+
+                // Compute IDF across the corpus
+                const N = buildings.length;
+                const df = new Map();
+                for (const b of buildings) {
+                    const seen = new Set(b._tokens);
+                    for (const t of seen) df.set(t, (df.get(t) || 0) + 1);
+                }
+                const idfMap = new Map();
+                for (const [t, d] of df) idfMap.set(t, Math.log((N - d + 0.5) / (d + 0.5) + 1));
+
+                const avgDocLen = buildings.reduce((s, b) => s + b._docLen, 0) / N;
+
+                // Score every building
+                const scored = buildings.map(b => {
+                    let score = bm25Score(b, qTokens, avgDocLen, idfMap);
+
+                    // ── Initialism / acronym boost ─────────────────────────────
+                    // If the query exactly matches or starts the building's initialism,
+                    // give a large bonus (initialism queries are very intentional).
+                    const ini = b._initialism;
+                    if (ini && ini === qRaw) score += 20;
+                    else if (ini && ini.startsWith(qRaw) && qRaw.length >= 2) score += 10;
+                    else if (ini && qRaw.startsWith(ini) && ini.length >= 2) score += 5;
+
+                    // Also check alias initialisms
+                    for (const ai of b._aliasInitialisms) {
+                        if (ai === qRaw) score += 15;
+                        else if (ai.startsWith(qRaw) && qRaw.length >= 2) score += 7;
+                    }
+
+                    // ── Exact name-start bonus ─────────────────────────────────
+                    const normName = (b.name || '').toLowerCase();
+                    if (normName.startsWith(q)) score += 8;
+                    else if (normName.includes(q)) score += 4;
+
+                    return { b, score };
+                });
+
+                // Keep only buildings with score > 0, sort descending, take top 4
+                const top = scored
+                    .filter(x => x.score > 0)
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 4)
+                    .map(x => x.b);
+
                 results.style.display = 'block';
-                if (matches.length > 0) {
-                    matches.forEach(m => {
+                if (top.length > 0) {
+                    top.forEach(m => {
                         const div = document.createElement('div');
                         div.className = 'result-item';
                         let icon = '📍';
@@ -596,10 +701,10 @@ out geom;`;
                         else if (m.type.includes('lib')) icon = '📚';
                         else if (m.type.includes('hostel')) icon = '🏠';
                         div.innerHTML = `<span style="font-size:18px;">${icon}</span><div style="flex:1;"><strong style="display:block; font-size:15px;">${m.name}</strong><small class="text-muted" style="text-transform:capitalize;">${m.type.replace(/_/g,' ')}</small></div>`;
-                        div.onclick = () => { 
-                            searchInput.value = m.name; results.style.display = 'none'; 
+                        div.onclick = () => {
+                            searchInput.value = m.name; results.style.display = 'none';
                             document.body.classList.remove('search-active');
-                            setDestination([m.lat, m.lon], m.name); 
+                            setDestination([m.lat, m.lon], m.name);
                         };
                         results.appendChild(div);
                     });

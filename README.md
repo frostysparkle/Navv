@@ -7,7 +7,9 @@
 ## 🚀 Key Features
 
 *   📶 **Offline-First Excellence:** Once the initial cache is complete, all rendering, searching, and routing logic works 100% offline.
-*   🧭 **Smart Turn-by-Turn Guidance:** Includes movement-based bearing calculation, turn smoothing (ignoring minor road curves), and active "Wrong Way" detection.
+*   🔄 **Dynamic Alternative Detours:** Encounter a blocked path? Use the "Alternative" button to instantly block the road ahead and recalculate a detour from your live location.
+*   🧭 **Smart Turn-by-Turn Guidance:** Includes movement-based bearing calculation, turn smoothing (ignoring minor road curves), active "Wrong Way" detection, and dynamic route trimming that shrinks the path as you walk.
+*   🎯 **Robust Multi-Node Snapping:** Intelligent pathfinding that tries multiple entry points to the routing graph, ensuring reliable navigation even when starting from off-path locations.
 *   ✨ **Modern Indigo Design System:** A clean, mobile-first interface featuring standardized glassmorphism, responsive panels, and a polished indigo brand palette.
 *   🔍 **Intelligent Search:** Fuzzy alphanumeric search that handles abbreviations and aliases, making POI discovery instant and reliable.
 *   🛡️ **Strict Geofencing:** Keeps the experience focused and reliable with locked map viewports and GPS boundary validation.

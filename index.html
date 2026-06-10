@@ -140,7 +140,10 @@
         <div style="padding: 0 24px;">
             <h2 id="route-dest-name" style="margin: 0 0 6px 0; font-size: 24px; color: #111; font-weight: 800; letter-spacing: -0.6px;">Destination</h2>
             <p id="route-distance" style="margin: 0 0 22px 0; font-size: 15px; color: #666; font-weight: 600;">Calculating...</p>
-            <button id="cancel-route-btn" style="width: 100%; padding: 18px; background: #EF4444; color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3); -webkit-tap-highlight-color: transparent;">End Route</button>
+            <div style="display:flex; gap:12px; width:100%;">
+                <button id="alt-route-btn" style="flex:1; padding: 18px; background: var(--primary); color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(79, 70, 229, 0.3); -webkit-tap-highlight-color: transparent;">Alternative</button>
+                <button id="cancel-route-btn" style="flex:1; padding: 18px; background: #EF4444; color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3); -webkit-tap-highlight-color: transparent;">End Route</button>
+            </div>
         </div>
     </div>
 
@@ -168,7 +171,8 @@
 
     <script>
         let campusData = null;
-        let map, userMarker, userLocation, watchId, lastRecalcLoc, currentHeading, currentDestination, currentDestinationName, destinationMarker, currentRoutePolyline, currentRoutePath = [], currentGraphNodes = [], isFollowing = false, toastTimeout, campusBounds, userHeading = null, lastLoc = null;
+        let map, userMarker, userLocation, watchId, currentHeading, currentDestination, currentDestinationName, destinationMarker, currentRoutePolyline, currentRoutePath = [], currentPathIds = [], isFollowing = false, toastTimeout, campusBounds, userHeading = null, lastLoc = null, firstPos = true;
+        let blockedNodeIds = new Set();
 
         // --- PHASE 3 LOGIC (Dijkstra, Distance, etc.) ---
         
@@ -499,24 +503,39 @@ out geom;`;
 
             map.on('click', () => { searchResults.style.display = 'none'; searchInput.blur(); });
             
+            document.getElementById('alt-route-btn').addEventListener('click', () => {
+                if (currentPathIds.length > 0) {
+                    // Block the immediate next node to force a detour
+                    blockedNodeIds.add(currentPathIds[0]);
+                    if (userLocation && currentDestination) {
+                        calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                    }
+                }
+            });
+
             document.getElementById('cancel-route-btn').addEventListener('click', () => {
                 if (currentRoutePolyline) map.removeLayer(currentRoutePolyline);
                 if (destinationMarker) map.removeLayer(destinationMarker);
                 currentDestination = null;
+                blockedNodeIds.clear();
                 document.getElementById('route-card').style.transform = 'translateY(100%)';
                 document.getElementById('gps-button').style.bottom = 'max(30px, env(safe-area-inset-bottom))';
                 document.getElementById('nav-banner').style.display = 'none';
-                currentRoutePath = []; currentGraphNodes = []; lastRecalcLoc = null; isFollowing = false;
-                map.setView(userLocation || [12.9914, 80.2337], 17);
+                currentRoutePath = []; currentPathIds = []; lastRecalcLoc = null; isFollowing = false;
+                if (userLocation) map.setView(userLocation, 17);
             });
         }
 
         const blueDotIcon = L.divIcon({
             className: 'user-location-icon',
             html: `
-                <div id="user-dot-root" style="position:relative; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
-                    <div id="user-arrow" style="position:absolute; top:0; left:50%; transform:translateX(-50%) rotate(0deg); transform-origin: center bottom; width:0; height:0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 22px solid rgba(79, 70, 229, 0.5); transition: transform 0.3s ease; display:none;"></div>
-                    <div style="width:18px; height:18px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79, 70, 229, 0.2), 0 2px 6px rgba(0,0,0,0.3); z-index:1; flex-shrink:0;"></div>
+                <div id="user-dot-root" style="position:relative; width:40px; height:40px;">
+                    <div id="user-arrow" style="position:absolute; top:-2px; left:50%; margin-left:-12px; transform-origin: center 22px; transition: transform 0.3s ease; display:none; z-index:0;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--primary)" opacity="0.7">
+                            <path d="M12 2L22 22L12 18L2 22Z" />
+                        </svg>
+                    </div>
+                    <div style="position:absolute; top:9px; left:9px; width:16px; height:16px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79, 70, 229, 0.3), 0 2px 6px rgba(0,0,0,0.3); z-index:1;"></div>
                 </div>`,
             iconSize: [40, 40],
             iconAnchor: [20, 20]
@@ -526,21 +545,17 @@ out geom;`;
             const gpsLocating = document.getElementById('gps-locating');
             const gpsBtn = document.getElementById('gps-button');
             
-            const handlePosition = (position, isInitial = false) => {
+            const handlePosition = (position, isExplicitRequest = false) => {
                 const lat = position.coords.latitude, lon = position.coords.longitude;
                 
-                // Track user heading based on GPS movement
                 if (lastLoc) {
                     const movedDist = getDistance(lastLoc[0], lastLoc[1], lat, lon);
-                    if (movedDist > 2) {
-                        userHeading = getBearing(lastLoc[0], lastLoc[1], lat, lon);
-                    }
+                    if (movedDist > 2) userHeading = getBearing(lastLoc[0], lastLoc[1], lat, lon);
                 }
                 lastLoc = [lat, lon];
 
-                // Geofencing check
                 if (campusBounds && !campusBounds.contains([lat, lon])) {
-                    if (!isInitial) {
+                    if (isExplicitRequest) {
                         gpsLocating.style.display = 'none';
                         showToast("Invalid Location: You are outside the campus.");
                     }
@@ -549,70 +564,79 @@ out geom;`;
 
                 gpsLocating.style.display = 'none';
                 userLocation = [lat, lon];
+                
                 if (!userMarker) {
                     userMarker = L.marker(userLocation, { icon: blueDotIcon }).addTo(map);
-                    map.setView(userLocation, 18);
-                    if (!isInitial) isFollowing = true;
+                    if (firstPos || isExplicitRequest) map.setView(userLocation, 18);
                 } else {
                     userMarker.setLatLng(userLocation);
-                    if (isFollowing || isInitial) map.setView(userLocation, 18);
+                    if (isFollowing) map.panTo(userLocation, { animate: true });
+                    else if (firstPos) map.setView(userLocation, 18);
                 }
+                
+                firstPos = false;
                 
                 if (currentDestination) {
                     if (currentRoutePath.length === 0) {
                         calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName || "Destination");
                     } else {
                         let minDistToRoute = Infinity;
+                        let closestIdx = 0;
                         for (let i = 0; i < currentRoutePath.length - 1; i++) {
                             const d = getDistanceToSegment(lat, lon, currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
-                            if (d < minDistToRoute) minDistToRoute = d;
+                            if (d < minDistToRoute) { minDistToRoute = d; closestIdx = i; }
                         }
-                        // Recalculate if off-route by > 12 meters (more aggressive for missed turns)
-                        if (minDistToRoute > 12) {
+                        
+                        if (minDistToRoute > 20) {
                             calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName || "Destination");
                         } else {
+                            // Trim the path
+                            if (closestIdx > 0) currentPathIds = currentPathIds.slice(closestIdx);
+                            const newPath = [[lat, lon]];
+                            for (let i = closestIdx + 1; i < currentRoutePath.length; i++) {
+                                newPath.push(currentRoutePath[i]);
+                            }
+                            currentRoutePath = newPath;
+                            currentRoutePolyline.setLatLngs(currentRoutePath);
                             updateNavBanner(lat, lon);
                         }
                     }
                 }
             };
 
-            const startGps = (isInitial = false) => {
+            const startGps = (isInitialLoad = false) => {
                 if (navigator.geolocation) {
-                    if (!isInitial) gpsLocating.style.display = 'flex';
+                    if (!isInitialLoad) gpsLocating.style.display = 'flex';
                     if (watchId) navigator.geolocation.clearWatch(watchId);
-                    
                     watchId = navigator.geolocation.watchPosition(
-                        pos => handlePosition(pos, isInitial),
+                        pos => handlePosition(pos, !isInitialLoad),
                         err => {
-                            if (!isInitial) {
+                            if (!isInitialLoad) {
                                 gpsLocating.style.display = 'none';
                                 if (err.code !== 3) showToast("Unable to access GPS location.");
                             }
                         },
                         { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
                     );
-                } else if (!isInitial) {
-                    showToast("Geolocation is not supported.");
-                }
+                } else if (!isInitialLoad) showToast("Geolocation is not supported.");
             };
 
             gpsBtn.addEventListener('click', () => {
-                startCompass(); // Attempt orientation (gesture-triggered)
+                startCompass();
                 gpsBtn.style.transform = 'scale(0.9)';
                 setTimeout(() => gpsBtn.style.transform = 'scale(1)', 200);
-                isFollowing = true; // Focus on user when button is tapped
+                isFollowing = true;
+                if (userLocation) map.flyTo(userLocation, 18, { animate: true, duration: 1 });
                 startGps(false);
             });
 
-            // Automatically request location on load
             startGps(true);
         }
 
         // Compass / Orientation Logic
         function applyHeading(degrees) {
             const arrowEl = document.getElementById('user-arrow');
-            if (arrowEl) { arrowEl.style.transform = `translateX(-50%) rotate(${degrees}deg)`; arrowEl.style.display = 'block'; }
+            if (arrowEl) { arrowEl.style.transform = `rotate(${degrees}deg)`; arrowEl.style.display = 'block'; }
         }
         function startCompass() {
             if (typeof DeviceOrientationEvent !== 'undefined') {
@@ -633,16 +657,20 @@ out geom;`;
         }
 
         // Navigation Logic
-        function snapToNearestNode(lat, lon) {
-            let nearestId = null, minDistance = Infinity;
+        function getNearestNodes(lat, lon, count) {
+            let nodes = [];
             for (const [id, coord] of Object.entries(campusData.graph.nodes)) {
-                const dist = getDistance(lat, lon, coord[1], coord[0]);
-                if (dist < minDistance) { minDistance = dist; nearestId = id; }
+                nodes.push({id, dist: getDistance(lat, lon, coord[1], coord[0])});
             }
-            return nearestId;
+            nodes.sort((a, b) => a.dist - b.dist);
+            return nodes.slice(0, count).map(n => n.id);
         }
 
-        function dijkstra(startId, endId) {
+        function snapToNearestNode(lat, lon) {
+            return getNearestNodes(lat, lon, 1)[0];
+        }
+
+        function dijkstra(startId, endId, blockedNodes = new Set()) {
             const graph = campusData.graph.edges;
             const distances = {}, previous = {}, pq = new PriorityQueue();
             for (const node in campusData.graph.nodes) { distances[node] = Infinity; previous[node] = null; }
@@ -653,6 +681,7 @@ out geom;`;
                 if (curr === endId) break;
                 if (graph[curr]) {
                     for (const neighbor in graph[curr]) {
+                        if (blockedNodes.has(neighbor)) continue;
                         const newDist = distances[curr] + graph[curr][neighbor];
                         if (newDist < distances[neighbor]) {
                             distances[neighbor] = newDist; previous[neighbor] = curr; pq.enqueue(neighbor, newDist);
@@ -667,6 +696,7 @@ out geom;`;
 
         function setDestination(latLng, name) {
             currentDestination = latLng; currentDestinationName = name;
+            blockedNodeIds.clear();
             if (destinationMarker) map.removeLayer(destinationMarker);
             destinationMarker = L.marker(latLng, { icon: L.divIcon({ className: 'dest-marker', html: '<div style="font-size:32px; margin-top:-32px; margin-left:-16px;">🎯</div>', iconSize: [32, 32] }) }).addTo(map);
             map.setView(latLng, 16);
@@ -676,13 +706,24 @@ out geom;`;
 
         function calculateAndDrawRoute(start, end, name) {
             if (currentRoutePolyline) map.removeLayer(currentRoutePolyline);
-            const sId = snapToNearestNode(start[0], start[1]), eId = snapToNearestNode(end[0], end[1]);
-            const pathIds = dijkstra(sId, eId);
+            
+            const startNodes = getNearestNodes(start[0], start[1], 5);
+            const endNodes = getNearestNodes(end[0], end[1], 5);
+            
+            let pathIds = null;
+            for (const sId of startNodes) {
+                for (const eId of endNodes) {
+                    pathIds = dijkstra(sId, eId, blockedNodeIds);
+                    if (pathIds) break;
+                }
+                if (pathIds) break;
+            }
+
             if (pathIds) {
+                currentPathIds = pathIds;
                 const latLngs = pathIds.map(id => [campusData.graph.nodes[id][1], campusData.graph.nodes[id][0]]);
                 latLngs.unshift(start); latLngs.push(end);
                 currentRoutePath = latLngs;
-                currentGraphNodes = pathIds.map(id => [campusData.graph.nodes[id][1], campusData.graph.nodes[id][0]]);
                 currentRoutePolyline = L.polyline(latLngs, { color: '#4F46E5', weight: 6, opacity: 0.85, dashArray: '10, 10' }).addTo(map);
                 if (!isFollowing) map.fitBounds(currentRoutePolyline.getBounds(), { padding: [50, 50] });
                 let dist = 0; for(let i=0; i<latLngs.length-1; i++) dist += getDistance(latLngs[i][0], latLngs[i][1], latLngs[i+1][0], latLngs[i+1][1]);
@@ -691,29 +732,30 @@ out geom;`;
                 isFollowing = true;
                 document.getElementById('route-card').style.transform = 'translateY(0)';
                 document.getElementById('gps-button').style.bottom = 'calc(max(30px, env(safe-area-inset-bottom)) + 180px)';
-            } else { showToast("No route found!"); }
+            } else { 
+                currentPathIds = [];
+                currentRoutePath = [];
+                showToast("No route found!"); 
+            }
         }
 
         function updateNavBanner(lat, lon) {
-            if (currentGraphNodes.length < 2) return;
-            let closestIdx = 0, minDist = Infinity;
-            for (let i = 0; i < currentGraphNodes.length - 1; i++) {
-                const d = getDistanceToSegment(lat, lon, currentGraphNodes[i][0], currentGraphNodes[i][1], currentGraphNodes[i+1][0], currentGraphNodes[i+1][1]);
-                if (d < minDist) { minDist = d; closestIdx = i; }
-            }
+            if (currentRoutePath.length < 2) return;
+            
             const dest = currentRoutePath[currentRoutePath.length - 1];
             const distToDest = getDistance(lat, lon, dest[0], dest[1]);
-            if (distToDest < 12) {
+            if (distToDest < 15) {
                 document.getElementById('nav-arrow').textContent = '🎯';
                 document.getElementById('nav-instruction').textContent = 'You have arrived!';
                 document.getElementById('nav-distance').textContent = 'Destination reached';
+                document.getElementById('nav-banner').style.display = 'flex';
                 return;
             }
             
-            let currentBearing = getBearing(currentGraphNodes[closestIdx][0], currentGraphNodes[closestIdx][1], currentGraphNodes[closestIdx+1][0], currentGraphNodes[closestIdx+1][1]);
+            let currentBearing = getBearing(lat, lon, currentRoutePath[1][0], currentRoutePath[1][1]);
             
-            // Check if user is walking wrong way
-            if (userHeading !== null) {
+            // Wrong way check
+            if (userHeading !== null && lastLoc) {
                 let diff = currentBearing - userHeading;
                 if (diff > 180) diff -= 360; if (diff < -180) diff += 360;
                 if (Math.abs(diff) > 135) {
@@ -726,22 +768,20 @@ out geom;`;
             }
 
             let turnInstr = { icon: '⬆️', text: 'Continue straight' }, found = false;
-            let distToTurn = getDistance(lat, lon, currentGraphNodes[closestIdx+1][0], currentGraphNodes[closestIdx+1][1]);
+            let distToTurn = getDistance(lat, lon, currentRoutePath[1][0], currentRoutePath[1][1]);
             
-            for (let i = closestIdx + 1; i < currentGraphNodes.length - 1; i++) {
-                const nextB = getBearing(currentGraphNodes[i][0], currentGraphNodes[i][1], currentGraphNodes[i+1][0], currentGraphNodes[i+1][1]);
+            for (let i = 1; i < currentRoutePath.length - 1; i++) {
+                const nextB = getBearing(currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
                 let diff = nextB - currentBearing;
                 if (diff > 180) diff -= 360; if (diff < -180) diff += 360;
                 
-                // Ignore micro-curves, only announce real turns > 25 degrees
                 if (Math.abs(diff) > 25) { 
                     turnInstr = getTurnInstruction(diff); 
                     found = true; 
                     break; 
                 }
-                // Update bearing for sequential segment checks
                 currentBearing = nextB;
-                distToTurn += getDistance(currentGraphNodes[i][0], currentGraphNodes[i][1], currentGraphNodes[i+1][0], currentGraphNodes[i+1][1]);
+                distToTurn += getDistance(currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
                 if (distToTurn > 200) break;
             }
             

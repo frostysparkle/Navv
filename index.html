@@ -549,7 +549,11 @@ out geom;`;
                             showToast('Using cached map data');
                         } else {
                             const loadingText = document.getElementById('loading-text');
-                            if (loadingText) loadingText.innerHTML = '<span style="color:var(--danger)">Failed to load map data. Please check connection and reload.</span>';
+                            if (loadingText) loadingText.innerHTML = `
+                                <span style="color:var(--danger)">Failed to load map data.</span><br>
+                                <span style="font-size:0.85em;opacity:0.8">The map server may be busy (429). Please wait a moment and try again.</span><br><br>
+                                <button onclick="location.reload()" style="padding:10px 24px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:1em;cursor:pointer;font-weight:600;">↺ Retry</button>
+                            `;
                             const spinner = document.querySelector('.spinning');
                             if (spinner) spinner.style.display = 'none';
                             return;

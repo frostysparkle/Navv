@@ -70,6 +70,7 @@ self.addEventListener('install', event => {
     }).then(() => {
       console.log('[SW] App shell cached.');
       cacheCampusTiles(); // Start tile pre-cache in background (non-blocking)
+      return self.skipWaiting(); // Activate immediately — no reload loop since page never calls location.reload() on controllerchange
     })
   );
 });

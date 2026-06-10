@@ -492,9 +492,10 @@ out geom;`;
                 let nearestId = null, minDist = Infinity;
                 if (b.nodes) {
                     b.nodes.forEach(nid => {
-                        if (data.graph.nodes[nid] && !nid.startsWith('b_')) {
-                            const d = getDistance(b.lat, b.lon, data.graph.nodes[nid][1], data.graph.nodes[nid][0]);
-                            if (d < minDist) { minDist = d; nearestId = nid; }
+                        const snid = String(nid);
+                        if (data.graph.nodes[snid] && !snid.startsWith('b_')) {
+                            const d = getDistance(b.lat, b.lon, data.graph.nodes[snid][1], data.graph.nodes[snid][0]);
+                            if (d < minDist) { minDist = d; nearestId = snid; }
                         }
                     });
                 }

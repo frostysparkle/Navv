@@ -204,10 +204,11 @@ self.addEventListener('fetch', event => {
       const networkFetch = fetch(event.request).then(resp => {
         if (resp.ok) {
           const clone = resp.clone();
-          event.waitUntil(caches.open(CACHE_NAME).then(c => c.put(event.request, clone)));
+          caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
         }
         return resp;
       });
+      event.waitUntil(networkFetch.catch(() => {}));
       return cached || networkFetch;
     })
   );

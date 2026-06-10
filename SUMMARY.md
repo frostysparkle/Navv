@@ -44,6 +44,11 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
 *   **Wrong-Way Detection:** Compares movement bearing with the planned route. If the user walks in the opposite direction, the HUD explicitly prompts them to **"Turn around"**.
 *   **Aggressive Rerouting:** Reduced the off-route threshold to **12 meters**. If a turn is missed, the system recalculates almost instantly to get the user back on track.
 
+### Phase 5: Routing Integrity & Network-First Caching
+*   **Building Shortcut Elimination:** Refactored the graph logic so buildings only attach to the nearest road using actual distance as a weight penalty, completely stopping Dijkstra from using buildings as zero-cost shortcuts.
+*   **Alternative Route Optimization:** Re-engineered the alternate routing mechanic to dynamically select the nearest future non-building node for blocking, completely avoiding staleness and off-by-one bugs. Recalculation now purges the entire path and re-routes from the exact GPS location.
+*   **Network-First Auto Updates:** Overhauled the Service Worker to apply a strict Network-First strategy to all local app shell files (`.html`, `.js`, `.css`), enabling instant over-the-air updates from GitHub Pages for online users while retaining fallback offline support.
+
 ---
 
 ## ⚡ Service Worker precaching & Offline Strategy

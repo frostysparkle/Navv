@@ -14,6 +14,7 @@
 *   🔍 **Intelligent Search:** Fuzzy alphanumeric search that handles abbreviations and aliases, making POI discovery instant and reliable.
 *   🛡️ **Strict Geofencing:** Keeps the experience focused and reliable with locked map viewports and GPS boundary validation.
 *   📈 **Dynamic Data Sync:** Uses the Overpass API to pull the latest buildings and walkable paths directly from OpenStreetMap, with background updates every 3 months.
+*   ☁️ **Instant Over-the-Air Updates:** Employs a strict Network-First caching strategy for the core app shell, ensuring that you always get the latest features pushed to GitHub Pages the moment you are online, with instant offline fallback.
 
 ---
 

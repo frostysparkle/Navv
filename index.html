@@ -109,6 +109,7 @@
             background: transparent; color: var(--text-main);
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; font-size: 20px; transition: all 0.2s;
+            flex-shrink: 0; padding: 0; margin: 0; box-sizing: border-box;
         }
         .icon-btn:active { transform: scale(0.9); background: rgba(128,128,128,0.1); }
         .icon-btn.active { color: var(--primary); }
@@ -116,11 +117,12 @@
         .search-input {
             flex: 1; border: none; background: transparent; outline: none;
             padding: 0 12px; font-family: inherit; font-size: 16px;
-            font-weight: 500; color: var(--text-main);
+            font-weight: 500; color: var(--text-main); min-width: 0;
+            height: 44px; margin: 0; box-sizing: border-box;
         }
 
         .search-results {
-            position: absolute; bottom: 70px; left: 0; width: 100%; max-height: 300px;
+            position: absolute; bottom: calc(100% + 12px); left: 0; width: 100%; max-height: 300px;
             border-radius: 24px; overflow-y: auto; display: none;
         }
         .result-item {
@@ -190,7 +192,13 @@
                 <button id="theme-toggle" class="icon-btn" aria-label="Toggle Dark Mode">🌙</button>
                 <input type="text" id="search-input" class="search-input" placeholder="Search campus...">
                 <button id="gps-button" class="icon-btn" aria-label="Center location">
-                    <svg id="gps-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                    <svg id="gps-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="6"></circle>
+                        <line x1="12" y1="2" x2="12" y2="6"></line>
+                        <line x1="12" y1="18" x2="12" y2="22"></line>
+                        <line x1="2" y1="12" x2="6" y2="12"></line>
+                        <line x1="18" y1="12" x2="22" y2="12"></line>
+                    </svg>
                 </button>
             </div>
         </div>
@@ -216,14 +224,17 @@
         function applyTheme(theme) {
             const body = document.body;
             const toggle = document.getElementById('theme-toggle');
+            const sunIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+            const moonIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+            
             if (theme === 'dark') {
                 body.classList.add('dark-theme');
                 body.classList.remove('light-theme');
-                toggle.textContent = '☀️';
+                toggle.innerHTML = sunIcon;
             } else {
                 body.classList.add('light-theme');
                 body.classList.remove('dark-theme');
-                toggle.textContent = '🌙';
+                toggle.innerHTML = moonIcon;
             }
             localStorage.setItem('theme', theme);
         }
@@ -481,7 +492,20 @@
             };
         }
 
-        const blueDotIcon = L.divIcon({ className: 'user-dot', html: `<div style="position:relative; width:40px; height:40px;"><div id="user-arrow" style="position:absolute; top:-2px; left:50%; margin-left:-12px; transform-origin: center 22px; transition: transform 0.3s; display:none;"><svg width="24" height="24" viewBox="0 0 24 24" fill="var(--primary)" opacity="0.8"><path d="M12 2L22 22L12 18L2 22Z"/></svg></div><div style="position:absolute; top:12px; left:12px; width:16px; height:16px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79,70,229,0.3);"></div></div>`, iconSize: [40, 40], iconAnchor: [20, 20] });
+        const blueDotIcon = L.divIcon({ 
+            className: 'user-dot', 
+            html: `
+                <div style="position:relative; width:40px; height:40px;">
+                    <div id="user-arrow" style="position:absolute; top:50%; left:50%; width:24px; height:24px; margin-left:-12px; margin-top:-24px; transform-origin: 50% 100%; transition: transform 0.3s; display:none; z-index:0;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--primary)" opacity="0.8">
+                            <path d="M12 2L22 22L12 18L2 22Z"/>
+                        </svg>
+                    </div>
+                    <div style="position:absolute; top:50%; left:50%; width:14px; height:14px; margin-left:-10px; margin-top:-10px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79,70,229,0.3); z-index:1; box-sizing: content-box;"></div>
+                </div>`, 
+            iconSize: [40, 40], 
+            iconAnchor: [20, 20] 
+        });
 
         function updateGPSUI() {
             const btn = document.getElementById('gps-button'), icon = document.getElementById('gps-icon');

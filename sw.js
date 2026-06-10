@@ -50,23 +50,26 @@ function getAllCampusTileUrls() {
 // ─── INSTALL: Cache app shell immediately, tiles deferred ────────────────────
 self.addEventListener('install', event => {
   console.log('[SW] Installing Navv Cache…');
-  // Single waitUntil call — spec only guarantees the first call is honoured
+  // Do NOT call skipWaiting() here unconditionally — doing so on every install
+  // triggers controllerchange on the page which calls location.reload(),
+  // creating an infinite reload loop. The SW will take over naturally on
+  // the next navigation, or when explicitly triggered via postMessage.
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       console.log('[SW] Caching Navv app shell');
-      // Use timestamp query params to bypass HTTP cache for the app shell during installation
       return Promise.all(
         ASSETS_TO_CACHE.map(url => {
           return fetch(`${url}?_cb=${Date.now()}`, { cache: 'no-cache' }).then(response => {
             if (!response.ok) throw new Error('Fetch failed for ' + url);
             return cache.put(url, response);
+          }).catch(err => {
+            console.warn('[SW] Failed to cache:', url, err);
           });
         })
       );
     }).then(() => {
-      console.log('[SW] App shell cached, skipping waiting');
-      self.skipWaiting();           // Take control immediately
-      cacheCampusTiles();           // Start tile pre-cache in background (non-blocking)
+      console.log('[SW] App shell cached.');
+      cacheCampusTiles(); // Start tile pre-cache in background (non-blocking)
     })
   );
 });
@@ -140,6 +143,10 @@ self.addEventListener('activate', event => {
 
 // ─── MESSAGE LISTENER: Handle client requests ──────────────────────────────
 self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    // Only skip waiting when explicitly requested (e.g. user clicks "Update" banner)
+    self.skipWaiting();
+  }
   if (event.data && event.data.type === 'REFRESH_TILES') {
     console.log('[SW] Refreshing tile cache as requested by client...');
     event.waitUntil(

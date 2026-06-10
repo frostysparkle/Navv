@@ -23,12 +23,13 @@
           navigator.serviceWorker.register('sw.js')
             .then(reg => {
               console.log('Service Worker registered!');
-              // Force check for sw.js updates bypassing HTTP cache limit
-              reg.update();
+              // NOTE: reg.update() intentionally removed — calling it on every load
+              // caused: SW reinstall → skipWaiting → controllerchange → reload → infinite loop.
+              // The SW updates naturally on next navigation after a new version is deployed.
             })
             .catch(err => console.error('Service Worker registration failed', err));
 
-          // Force reload when a new Service Worker takes control
+          // Reload once when a NEW service worker takes control (skips on first install)
           let refreshing = false;
           navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (!refreshing) {

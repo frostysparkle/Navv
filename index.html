@@ -533,7 +533,7 @@ out geom;`;
                 document.getElementById('route-card').style.transform = 'translateY(100%)';
                 document.getElementById('gps-button').style.bottom = 'max(30px, env(safe-area-inset-bottom))';
                 document.getElementById('nav-banner').style.display = 'none';
-                currentRoutePath = []; currentPathIds = []; lastRecalcLoc = null; isFollowing = false;
+                currentRoutePath = []; currentPathIds = []; isFollowing = false;
                 if (userLocation) map.setView(userLocation, 17);
             });
         }

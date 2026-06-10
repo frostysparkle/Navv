@@ -164,9 +164,10 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 2. App shell (index.html, root) → Network-First
+  // 2. App shell (HTML navigation) → Network-First
   // This ensures users always get the latest version if online.
-  if (url.hostname === self.location.hostname && (url.pathname === '/' || url.pathname.endsWith('index.html'))) {
+  // Using request.mode === 'navigate' safely catches the app shell even on subpaths like GitHub Pages (/Navv/).
+  if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).then(resp => {
         if (resp.ok) {

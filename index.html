@@ -516,12 +516,38 @@ out geom;`;
             map.on('click', () => { searchResults.style.display = 'none'; searchInput.blur(); });
             
             document.getElementById('alt-route-btn').addEventListener('click', () => {
-                if (currentPathIds.length > 0) {
-                    // Block the immediate next node to force a detour
-                    blockedNodeIds.add(currentPathIds[0]);
-                    if (userLocation && currentDestination) {
-                        calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                if (currentPathIds.length > 1) {
+                    let nodeToBlock = currentPathIds[1];
+                    if (typeof nodeToBlock === 'string' && nodeToBlock.startsWith('b_')) {
+                        showToast("You are almost there. No alternate route needed.");
+                        return;
                     }
+
+                    blockedNodeIds.add(nodeToBlock);
+                    
+                    if (userLocation && currentDestination) {
+                        const startNodes = getNearestNodes(userLocation[0], userLocation[1], 5);
+                        const endNodes = getNearestNodes(currentDestination[0], currentDestination[1], 5);
+                        let hasAlternate = false;
+                        for (const sId of startNodes) {
+                            for (const eId of endNodes) {
+                                if (dijkstra(sId, eId, blockedNodeIds)) {
+                                    hasAlternate = true;
+                                    break;
+                                }
+                            }
+                            if (hasAlternate) break;
+                        }
+
+                        if (hasAlternate) {
+                            calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                        } else {
+                            blockedNodeIds.delete(nodeToBlock);
+                            showToast("No alternate route found.");
+                        }
+                    }
+                } else {
+                    showToast("No alternate route available.");
                 }
             });
 

@@ -369,11 +369,41 @@
         async function getCachedData() { const db = await initDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readonly'); const store = tx.objectStore(STORE_NAME); const req = store.get('navv_data'); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
         async function saveToCache(data) { const db = await initDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const store = tx.objectStore(STORE_NAME); const req = store.put({ data, timestamp: Date.now() }, 'navv_data'); req.onsuccess = () => res(); req.onerror = () => rej(req.error); }); }
 
+        function dismissLoadingSpinner() {
+            const loading = document.getElementById('loading');
+            if (loading) { loading.style.opacity = '0'; setTimeout(() => loading.remove(), 500); }
+        }
+
         async function fetchFromOverpass() {
-            const query = `[out:json][timeout:900]; area["name"="Indian Institute of Technology - Madras"]->.iitm; (node(area.iitm); way(area.iitm); relation(area.iitm); relation["name"="Indian Institute of Technology - Madras"]; way["name"="Indian Institute of Technology - Madras"]; ); out geom;`;
-            const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: "data=" + encodeURIComponent(query), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-            if (!res.ok) throw new Error('Overpass fail');
-            return await res.json();
+            // Focused query: only fetch campus boundary, named buildings/amenities, and walkable paths.
+            // Timeout is 120s server-side; we also enforce a 35s client-side abort.
+            const query = `[out:json][timeout:120];
+(
+  relation["name"="Indian Institute of Technology - Madras"];
+  way["name"="Indian Institute of Technology - Madras"];
+  way["highway"](12.978,80.220,13.008,80.248);
+  node["name"]["amenity"](12.978,80.220,13.008,80.248);
+  node["name"]["building"](12.978,80.220,13.008,80.248);
+  way["name"]["building"](12.978,80.220,13.008,80.248);
+  way["name"]["amenity"](12.978,80.220,13.008,80.248);
+  way["name"]["leisure"](12.978,80.220,13.008,80.248);
+  relation["name"]["building"](12.978,80.220,13.008,80.248);
+);
+out geom;`;
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 35000);
+            try {
+                const res = await fetch('https://overpass-api.de/api/interpreter', {
+                    method: 'POST',
+                    body: 'data=' + encodeURIComponent(query),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    signal: controller.signal
+                });
+                if (!res.ok) throw new Error('Overpass API returned ' + res.status);
+                return await res.json();
+            } finally {
+                clearTimeout(timer);
+            }
         }
 
         function processOSMData(osmData) {
@@ -461,15 +491,33 @@
         async function loadApp() {
             try {
                 const cached = await getCachedData();
-                if (cached && (Date.now() - cached.timestamp < 90 * 24 * 60 * 60 * 1000)) campusData = cached.data;
-                else if (!navigator.onLine && cached) campusData = cached.data;
-                else { const osm = await fetchFromOverpass(); campusData = processOSMData(osm); await saveToCache(campusData); if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'REFRESH_TILES' }); }
+                if (cached && (Date.now() - cached.timestamp < 90 * 24 * 60 * 60 * 1000)) {
+                    campusData = cached.data;
+                } else if (!navigator.onLine && cached) {
+                    campusData = cached.data;
+                } else {
+                    try {
+                        const osm = await fetchFromOverpass();
+                        campusData = processOSMData(osm);
+                        await saveToCache(campusData);
+                        if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'REFRESH_TILES' });
+                    } catch (fetchErr) {
+                        console.warn('[Navv] Overpass fetch failed, falling back to cache:', fetchErr.message);
+                        if (cached) {
+                            campusData = cached.data;
+                            showToast('Using cached map data');
+                        } else {
+                            dismissLoadingSpinner();
+                            alert('Could not load map data. Please check your internet connection and reload.');
+                            return;
+                        }
+                    }
+                }
                 initMap();
             } catch (err) {
-                console.error(err);
-                const cached = await getCachedData();
-                if (cached) { campusData = cached.data; initMap(); }
-                else alert('Failed to load map data. Check connection.');
+                console.error('[Navv] loadApp error:', err);
+                dismissLoadingSpinner();
+                alert('Failed to start app. Please reload.');
             }
         }
 
@@ -491,7 +539,7 @@
                 map.options.maxBoundsViscosity = 0.8;
             }
             
-            map.whenReady(() => { setTimeout(() => { const loading = document.getElementById('loading'); if (loading) { loading.style.opacity = '0'; setTimeout(() => loading.remove(), 500); } }, 500); });
+            map.whenReady(() => { setTimeout(dismissLoadingSpinner, 500); });
 
             // Build the blue-dot marker icon here — L is guaranteed to be loaded at this point
             blueDotIcon = L.divIcon({ 

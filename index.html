@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Navv</title>
+    <title>Navv – Campus Navigation</title>
+    <meta name="description" content="Offline-first campus navigation PWA for IIT Madras. Search buildings, get walking directions, and navigate campus without internet.">
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4F46E5">
@@ -130,6 +131,25 @@
             font-weight: 500; color: var(--text-main); min-width: 0;
         }
 
+        /* Control Capsule — the search bar pill container */
+        .control-capsule {
+            display: flex; align-items: center; padding: 6px 12px; border-radius: 99px;
+            height: 52px; box-sizing: border-box;
+        }
+
+        /* Icon Button — the circular buttons inside the capsule */
+        .icon-btn {
+            width: 40px; height: 40px; border-radius: 50%; border: none; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s; background: transparent;
+            color: var(--text-main); font-size: 18px; padding: 0;
+        }
+        .icon-btn:active { transform: scale(0.88); }
+        .icon-btn.active { color: var(--primary); }
+
+        /* Utility: muted text color */
+        .text-muted { color: var(--text-muted); }
+
         .search-results {
             position: absolute; bottom: calc(100% + 12px); left: 0; width: 100%; max-height: 50vh;
             border-radius: 24px; overflow-y: auto; display: none;
@@ -167,6 +187,15 @@
             font-weight: 700; font-size: 15px; cursor: pointer; transition: opacity 0.2s;
         }
 
+        /* Top UI Layer */
+        .ui-top {
+            position: fixed; top: var(--safe-top); left: 50%;
+            transform: translateX(-50%); width: 92%; max-width: 440px;
+            z-index: 1000; display: flex; flex-direction: column; align-items: center; gap: 8px;
+            pointer-events: none;
+        }
+        .ui-top > * { pointer-events: auto; }
+
         /* Map Attribution Fix */
         .leaflet-control-attribution {
             margin-bottom: 80px !important; transition: margin-bottom 0.4s ease;
@@ -198,6 +227,13 @@
 
     <div class="ui-top">
         <div id="offline-indicator" class="glass" style="padding:10px 20px; border-radius:99px; color:var(--danger); font-weight:700; font-size:13px; display:none;">⚠️ Offline</div>
+        
+        <!-- Progress Bar for Map Caching -->
+        <div id="tile-progress-bar" class="glass" style="padding:10px 20px; border-radius:99px; font-weight:700; font-size:13px; display:none; align-items:center; gap:8px;">
+            <div class="spinning" style="width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--primary); border-radius:50%;"></div>
+            Caching Map: <span id="tile-progress-pct">0%</span>
+        </div>
+
         <div id="toast" class="glass" style="padding:12px 24px; border-radius:99px; font-weight:600; font-size:14px; opacity:0; transition:opacity 0.3s;">Notification</div>
         <div id="nav-banner" class="glass" style="width:90%; max-width:350px; padding:16px; border-radius:24px; display:none; align-items:center; gap:16px;">
             <div id="nav-arrow" style="font-size:32px;">⬆️</div>
@@ -248,6 +284,7 @@
         let map, userMarker, userLocation, watchId, currentHeading, currentDestination, currentDestinationName, destinationMarker, currentRoutePolyline, currentRoutePath = [], currentPathIds = [], isFollowing = false, toastTimeout, campusBounds, userHeading = null, lastLoc = null, firstPos = true;
         let blockedNodeIds = new Set();
         let isCalculatingRoute = false;
+        let blueDotIcon; // Assigned inside initMap() once Leaflet (L) is confirmed loaded
 
         // --- THEME LOGIC ---
         function applyTheme(theme) {
@@ -276,49 +313,45 @@
             applyTheme(current);
         });
 
-        // --- PWA INSTALL LOGIC ---
-        let deferredPrompt;
-        const installBanner = document.getElementById('install-prompt');
-        const installBtn = document.getElementById('install-button');
-
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            installBanner.style.display = 'flex';
-        });
-
-        installBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') console.log('User accepted install');
-                deferredPrompt = null;
-                installBanner.style.display = 'none';
-            } else {
-                // Manual instruction for iOS
-                showToast("Tap Share -> Add to Home Screen to install.");
-            }
-        });
-
-        document.getElementById('install-close').addEventListener('click', () => { installBanner.style.display = 'none'; });
-
-        // Detection for iOS Safari
-        const isIos = /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-        const isStandalone = window.navigator.standalone === true;
-        if (isIos && !isStandalone) {
-            document.getElementById('install-text').textContent = "Install Navv for offline use";
-            installBanner.style.display = 'flex';
-        }
-
         // --- ROUTING LOGIC ---
         class PriorityQueue {
-            constructor() { this.elements = []; }
+            constructor() { this.heap = []; }
             enqueue(element, priority) {
-                this.elements.push({element, priority});
-                this.elements.sort((a, b) => a.priority - b.priority);
+                this.heap.push({element, priority});
+                this.bubbleUp();
             }
-            dequeue() { return this.elements.shift().element; }
-            isEmpty() { return this.elements.length === 0; }
+            dequeue() {
+                if (this.heap.length === 0) return null;
+                if (this.heap.length === 1) return this.heap.pop().element;
+                const top = this.heap[0].element;
+                this.heap[0] = this.heap.pop();
+                this.bubbleDown();
+                return top;
+            }
+            bubbleUp() {
+                let idx = this.heap.length - 1;
+                while (idx > 0) {
+                    let parentIdx = Math.floor((idx - 1) / 2);
+                    if (this.heap[idx].priority >= this.heap[parentIdx].priority) break;
+                    [this.heap[idx], this.heap[parentIdx]] = [this.heap[parentIdx], this.heap[idx]];
+                    idx = parentIdx;
+                }
+            }
+            bubbleDown() {
+                let idx = 0;
+                while (true) {
+                    let left = 2 * idx + 1, right = 2 * idx + 2, smallest = null;
+                    if (left < this.heap.length) if (this.heap[left].priority < this.heap[idx].priority) smallest = left;
+                    if (right < this.heap.length) {
+                        if ((smallest === null && this.heap[right].priority < this.heap[idx].priority) ||
+                            (smallest !== null && this.heap[right].priority < this.heap[left].priority)) smallest = right;
+                    }
+                    if (smallest === null) break;
+                    [this.heap[idx], this.heap[smallest]] = [this.heap[smallest], this.heap[idx]];
+                    idx = smallest;
+                }
+            }
+            isEmpty() { return this.heap.length === 0; }
         }
 
         function getDistance(lat1, lon1, lat2, lon2) {
@@ -346,14 +379,27 @@
             const data = { buildings: [], graph: { nodes: {}, edges: {} }, boundary: null };
             const allNodes = {};
             osmData.elements.forEach(el => { if (el.type === 'node') allNodes[el.id] = [el.lat, el.lon]; });
+            
+            // Boundary stitching logic
+            let boundarySegments = [];
             osmData.elements.forEach(el => {
                 const tags = el.tags || {};
-                if (tags.name === 'Indian Institute of Technology - Madras' || tags.name === 'Indian Institute of Technology Madras') {
-                    let coords = [];
-                    if (el.type === 'way' && el.geometry) coords = el.geometry.map(p => [p.lon, p.lat]);
-                    else if (el.type === 'relation' && el.members) el.members.forEach(m => { if (m.role === 'outer' && m.geometry) coords.push(...m.geometry.map(p => [p.lon, p.lat])); });
-                    if (coords.length > 0) data.boundary = { type: 'Polygon', coordinates: [coords] };
+                const isIITM = tags.name === 'Indian Institute of Technology - Madras' || tags.name === 'Indian Institute of Technology Madras';
+                if (isIITM) {
+                    if (el.type === 'way' && el.geometry) boundarySegments.push(el.geometry.map(p => [p.lat, p.lon]));
+                    else if (el.type === 'relation' && el.members) {
+                        el.members.forEach(m => { if (m.role === 'outer' && m.geometry) boundarySegments.push(m.geometry.map(p => [p.lat, p.lon])); });
+                    }
                 }
+            });
+
+            if (boundarySegments.length > 0) {
+                const stitched = stitchSegments(boundarySegments);
+                if (stitched.length > 0) data.boundary = { type: 'Polygon', coordinates: [stitched.map(p => [p[1], p[0]])] };
+            }
+
+            osmData.elements.forEach(el => {
+                const tags = el.tags || {};
                 const isPOI = tags.name && (tags.building || tags.amenity || tags.leisure || tags.shop || tags.tourism);
                 const getAliases = (t) => { const a = []; if (t.alt_name) a.push(t.alt_name); if (t.short_name) a.push(t.short_name); if (t['name:en']) a.push(t['name:en']); return a; };
                 if (el.type === 'node' && isPOI) data.buildings.push({ id: el.id, name: tags.name, lat: el.lat, lon: el.lon, aliases: getAliases(tags), type: tags.building || tags.amenity || tags.leisure || 'POI' });
@@ -396,6 +442,21 @@
             return data;
         }
 
+        function stitchSegments(segs) {
+            if (segs.length === 0) return [];
+            let points = segs.shift();
+            while (segs.length > 0) {
+                let found = false, last = points[points.length - 1];
+                for (let i = 0; i < segs.length; i++) {
+                    let s = segs[i], first = s[0], fend = s[s.length - 1];
+                    if (getDistance(last[0], last[1], first[0], first[1]) < 1) { points.push(...s.slice(1)); segs.splice(i, 1); found = true; break; }
+                    if (getDistance(last[0], last[1], fend[0], fend[1]) < 1) { points.push(...s.reverse().slice(1)); segs.splice(i, 1); found = true; break; }
+                }
+                if (!found) break;
+            }
+            return points;
+        }
+
         async function loadApp() {
             try {
                 const cached = await getCachedData();
@@ -413,7 +474,7 @@
 
         function initMap() {
             map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 22 }).setView([12.9914, 80.2337], 17);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxNativeZoom: 19, maxZoom: 22 }).addTo(map);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', maxNativeZoom: 18, maxZoom: 22 }).addTo(map);
             map.on('dragstart', () => { isFollowing = false; updateGPSUI(); });
 
             const worldCoords = [[90, -180], [90, 180], [-90, 180], [-90, -180]];
@@ -431,6 +492,21 @@
             
             map.whenReady(() => { setTimeout(() => { const loading = document.getElementById('loading'); if (loading) { loading.style.opacity = '0'; setTimeout(() => loading.remove(), 500); } }, 500); });
 
+            // Build the blue-dot marker icon here — L is guaranteed to be loaded at this point
+            blueDotIcon = L.divIcon({ 
+                className: 'user-dot', 
+                html: `
+                    <div style="position:relative; width:40px; height:40px;">
+                        <div id="user-arrow" style="position:absolute; top:50%; left:50%; width:24px; height:24px; margin-left:-12px; margin-top:-24px; transform-origin: 50% 100%; transition: transform 0.3s; display:none; z-index:0;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--primary)" opacity="0.8">
+                                <path d="M12 2L22 22L12 18L2 22Z"/>
+                            </svg>
+                        </div>
+                        <div style="position:absolute; top:50%; left:50%; width:14px; height:14px; margin-left:-10px; margin-top:-10px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79,70,229,0.3); z-index:1; box-sizing: content-box;"></div>
+                    </div>`, 
+                iconSize: [40, 40], 
+                iconAnchor: [20, 20] 
+            });
             setupUI();
             setupGeolocation();
         }
@@ -447,7 +523,7 @@
             searchInput.onfocus = () => { document.body.classList.add('search-active'); };
             searchInput.onblur = () => { setTimeout(() => { if (results.style.display === 'none') document.body.classList.remove('search-active'); }, 200); };
 
-            clear.onclick = () => { searchInput.value = ''; clear.style.display = 'none'; results.style.display = 'none'; document.body.classList.remove('search-active'); searchInput.focus(); };
+            clear.onclick = () => { searchInput.value = ''; clear.style.display = 'none'; results.style.display = 'none'; searchInput.focus(); };
 
             searchInput.addEventListener('input', (e) => {
                 const raw = e.target.value;
@@ -457,7 +533,7 @@
                 
                 if (q.length < 2) { results.style.display = 'none'; return; }
                 const matches = campusData.buildings.filter(b => {
-                    const name = b.name.toLowerCase().replace(/[^a-z0-9]/g, ''), type = (b.type || '').toLowerCase();
+                    const name = (b.name || '').toLowerCase().replace(/[^a-z0-9]/g, ''), type = (b.type || '').toLowerCase();
                     return name.includes(q) || type.includes(q) || (b.aliases && b.aliases.some(a => a.toLowerCase().includes(q)));
                 }).slice(0, 10);
                 
@@ -505,7 +581,10 @@
             document.getElementById('cancel-route-btn').onclick = () => {
                 if (currentRoutePolyline) map.removeLayer(currentRoutePolyline);
                 if (destinationMarker) map.removeLayer(destinationMarker);
-                currentDestination = null; blockedNodeIds.clear();
+                // Null out ALL state to prevent stale references causing crashes on next GPS tick
+                currentDestination = null; currentDestinationName = null;
+                currentRoutePolyline = null; destinationMarker = null;
+                blockedNodeIds.clear();
                 document.getElementById('route-card').style.transform = 'translateY(100%)';
                 document.getElementById('nav-banner').style.display = 'none';
                 document.querySelector('.search-container').style.opacity = '1';
@@ -534,20 +613,7 @@
             if (/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase()) && !navigator.standalone) installBtn.style.display = 'flex';
         }
 
-        const blueDotIcon = L.divIcon({ 
-            className: 'user-dot', 
-            html: `
-                <div style="position:relative; width:40px; height:40px;">
-                    <div id="user-arrow" style="position:absolute; top:50%; left:50%; width:24px; height:24px; margin-left:-12px; margin-top:-24px; transform-origin: 50% 100%; transition: transform 0.3s; display:none; z-index:0;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--primary)" opacity="0.8">
-                            <path d="M12 2L22 22L12 18L2 22Z"/>
-                        </svg>
-                    </div>
-                    <div style="position:absolute; top:50%; left:50%; width:14px; height:14px; margin-left:-10px; margin-top:-10px; background:var(--primary); border:3px solid white; border-radius:50%; box-shadow:0 0 0 4px rgba(79,70,229,0.3); z-index:1; box-sizing: content-box;"></div>
-                </div>`, 
-            iconSize: [40, 40], 
-            iconAnchor: [20, 20] 
-        });
+
 
         function updateGPSUI() {
             const btn = document.getElementById('gps-button'), icon = document.getElementById('gps-icon');
@@ -560,7 +626,11 @@
                 const lat = pos.coords.latitude, lon = pos.coords.longitude;
                 if (lastLoc) if (getDistance(lastLoc[0], lastLoc[1], lat, lon) > 2) userHeading = getBearing(lastLoc[0], lastLoc[1], lat, lon);
                 lastLoc = [lat, lon];
-                if (campusBounds && !campusBounds.contains([lat, lon])) return;
+                
+                // Allow user to be visible slightly outside campus for arrival UX
+                const isVeryFar = campusBounds && campusBounds.pad(0.2).contains([lat, lon]) === false;
+                if (isVeryFar) return;
+
                 userLocation = [lat, lon];
                 if (!userMarker) { userMarker = L.marker(userLocation, { icon: blueDotIcon }).addTo(map); if (firstPos) map.setView(userLocation, 18); }
                 else { userMarker.setLatLng(userLocation); if (isFollowing) map.panTo(userLocation); }
@@ -569,8 +639,11 @@
                     if (currentRoutePath.length === 0) calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
                     else {
                         let minDist = Infinity;
-                        for (let i = 0; i < currentRoutePath.length - 1; i++) minDist = Math.min(minDist, getDistanceToSegment(lat, lon, currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]));
-                        if (minDist > 20) calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
+                        for (let i = 0; i < currentRoutePath.length - 1; i++) {
+                            const d = getDistanceToSegment(lat, lon, currentRoutePath[i][0], currentRoutePath[i][1], currentRoutePath[i+1][0], currentRoutePath[i+1][1]);
+                            if (d < minDist) minDist = d;
+                        }
+                        if (minDist > 15) calculateAndDrawRoute(userLocation, currentDestination, currentDestinationName);
                         else updateNavBanner(lat, lon);
                     }
                 }
@@ -578,11 +651,15 @@
             
             const start = () => navigator.geolocation.watchPosition(handlePos, (e) => { if (e.code !== 3) showToast("GPS error"); }, { enableHighAccuracy: true, maximumAge: 0 });
             watchId = start();
+            let orientListening = false; // Guard: prevent duplicate listeners on repeated GPS button taps
             gpsBtn.onclick = () => { 
                 isFollowing = true; updateGPSUI(); 
                 if (userLocation) map.flyTo(userLocation, 18);
-                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission().then(s => { if (s==='granted') window.addEventListener('deviceorientationabsolute', onOrient, true); });
-                else window.addEventListener('deviceorientationabsolute', onOrient, true);
+                if (!orientListening) {
+                    orientListening = true;
+                    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') DeviceOrientationEvent.requestPermission().then(s => { if (s==='granted') window.addEventListener('deviceorientationabsolute', onOrient, true); });
+                    else window.addEventListener('deviceorientationabsolute', onOrient, true);
+                }
             };
         }
 
@@ -622,7 +699,7 @@
             if (pIds) {
                 currentPathIds = pIds; const lls = pIds.map(id => [campusData.graph.nodes[id][1], campusData.graph.nodes[id][0]]);
                 lls.unshift(start); lls.push(end); currentRoutePath = lls;
-                currentRoutePolyline = L.polyline(lls, { color: 'var(--primary)', weight: 6, opacity: 0.9, dashArray: '12, 12', className: 'route-path-animated' }).addTo(map);
+                currentRoutePolyline = L.polyline(lls, { color: '#4F46E5', weight: 6, opacity: 0.9, dashArray: '12, 12', className: 'route-path-animated' }).addTo(map);
                 let d = 0; for (let i=0; i<lls.length-1; i++) d += getDistance(lls[i][0], lls[i][1], lls[i+1][0], lls[i+1][1]);
                 document.getElementById('route-dest-name').textContent = name;
                 document.getElementById('route-distance').textContent = `${Math.round(d)}m • ${Math.ceil(d/80)} min walk`;
@@ -648,7 +725,17 @@
         }
 
         function getBearing(la1, lo1, la2, lo2) { const f1 = la1 * Math.PI / 180, f2 = la2 * Math.PI / 180, dl = (lo2-lo1) * Math.PI / 180; const y = Math.sin(dl) * Math.cos(f2), x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; }
-        function getDistanceToSegment(px, py, x1, y1, x2, y2) { const l2 = Math.pow(x2-x1, 2) + Math.pow(y2-y1, 2); if (l2 === 0) return getDistance(px, py, x1, y1); let t = Math.max(0, Math.min(1, ((px-x1)*(x2-x1)+(py-y1)*(y2-y1))/l2)); return getDistance(px, py, x1+t*(x2-x1), y1+t*(y2-y1)); }
+
+        function getDistanceToSegment(plat, plon, lat1, lon1, lat2, lon2) {
+            // Use lat/lon relative scaling for better accuracy in small areas
+            const lonScale = Math.cos(plat * Math.PI / 180);
+            const dLat = lat2 - lat1, dLon = (lon2 - lon1) * lonScale;
+            const l2 = dLat * dLat + dLon * dLon;
+            if (l2 === 0) return getDistance(plat, plon, lat1, lon1);
+            let t = ((plat - lat1) * dLat + (plon - lon1) * lonScale * dLon) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return getDistance(plat, plon, lat1 + t * (lat2 - lat1), lon1 + t * (lon2 - lon1));
+        }
         function showToast(m) { const t = document.getElementById('toast'); t.textContent = m; t.style.opacity = '1'; clearTimeout(toastTimeout); toastTimeout = setTimeout(() => t.style.opacity = '0', 3000); }
 
         if ('serviceWorker' in navigator) {

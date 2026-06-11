@@ -87,3 +87,16 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
 *   **Search Robustness:** Excellent (supports abbreviations and fuzzy matching).
 *   **UI/UX Aesthetic:** Modern, high-performance, Google Maps inspired.
 *   **Service Worker:** Robust — immediate activation, Network-First shell updates, graceful error recovery.
+*   **Direction Arrow:** Stable — angle-unwrapped rAF easing with low-pass sensor filtering; no more oscillation.
+
+---
+
+### Phase 8: Direction Arrow Stabilisation
+
+*   **Root Cause 1 — CSS `transition` wrap-around spin:** The arrow had `transition: transform 0.25s ease-out`. When the raw compass angle jumped near the 0°/360° boundary (e.g., `350° → 10°`), the browser interpolated **backward** through 340° instead of the short 20° path, causing a near-full-circle spin. **Fix:** Removed the CSS transition entirely.
+*   **Root Cause 2 — Noisy sensor data:** `deviceorientation` events fire with significant jitter on Android devices. Without filtering, every erratic spike was applied instantly, causing rapid oscillation. **Fix:** Applied an **exponential low-pass filter** (α = 0.15) using shortest-path angle blending (`_angleDiff`) so noisy spikes are dampened before reaching the arrow.
+*   **`requestAnimationFrame` easing loop:** Replaced the CSS transition with a JS-driven `_animateArrow()` rAF loop that:
+    *   Computes the **shortest angular delta** (always ≤ 180°) via `_angleDiff()`, preventing long-way-around spins regardless of the raw angle.
+    *   Tracks a **cumulative unwrapped `_displayAngle`** so the arrow never resets across the 0°/360° wrap boundary.
+    *   Eases at 15% per frame (~200 ms settle at 60 fps) for smooth visuals, and **cancels itself** once within 0.5° of the target to avoid wasting CPU when stationary.
+

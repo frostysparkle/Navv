@@ -638,7 +638,7 @@ out geom;`;
                 className: 'user-dot', 
                 html: `
                     <div style="position:relative; width:40px; height:40px; overflow:visible;">
-                        <div id="user-arrow" style="position:absolute; top:50%; left:50%; width:22px; height:26px; margin-left:-11px; margin-top:-26px; transform-origin: 50% 100%; transition: transform 0.25s ease-out; display:none; z-index:2;">
+                        <div id="user-arrow" style="position:absolute; top:50%; left:50%; width:22px; height:26px; margin-left:-11px; margin-top:-26px; transform-origin: 50% 100%; display:none; z-index:2;">
                             <svg width="22" height="26" viewBox="0 0 22 26" fill="none">
                                 <path d="M11 0L22 26L11 19L0 26Z" fill="#4F46E5" stroke="white" stroke-width="2" stroke-linejoin="round"/>
                             </svg>
@@ -964,6 +964,36 @@ out geom;`;
         }
 
         let _hasAbsoluteCompass = false; // true once a real compass heading has been received
+        let _smoothedHeading = null;      // low-pass filtered heading (degrees, unwrapped)
+        let _displayAngle = 0;            // cumulative unwrapped angle applied to the arrow
+        let _arrowRafId = null;           // requestAnimationFrame handle for arrow smoothing
+
+        // Normalize angle difference to [-180, 180]
+        function _angleDiff(a, b) {
+            let d = ((a - b) % 360 + 540) % 360 - 180;
+            return d;
+        }
+
+        function _animateArrow() {
+            const el = document.getElementById('user-arrow');
+            if (!el || _smoothedHeading === null) { _arrowRafId = null; return; }
+
+            // Compute shortest-path delta from current display angle to target
+            const diff = _angleDiff(_smoothedHeading, _displayAngle % 360);
+            if (Math.abs(diff) < 0.5) {
+                // Close enough — snap and stop
+                _displayAngle += diff;
+                el.style.transform = `rotate(${_displayAngle}deg)`;
+                _arrowRafId = null;
+                return;
+            }
+
+            // Ease toward target at 15% per frame (~60 fps → ~200 ms settle)
+            _displayAngle += diff * 0.15;
+            el.style.transform = `rotate(${_displayAngle}deg)`;
+            _arrowRafId = requestAnimationFrame(_animateArrow);
+        }
+
         function onOrient(e) {
             let h = null;
             // Priority 1: webkitCompassHeading (iOS — true North, most reliable)
@@ -979,9 +1009,20 @@ out geom;`;
                 h = (360 - e.alpha) % 360;
             }
             if (h !== null) {
-                userHeading = h;
+                // Low-pass filter: smooth out sensor noise (α=0.15 → strong smoothing)
+                if (_smoothedHeading === null) {
+                    _smoothedHeading = h;
+                    _displayAngle = h;
+                } else {
+                    // Shortest-path blend to avoid wrap-around jumps in the filter itself
+                    const delta = _angleDiff(h, _smoothedHeading);
+                    _smoothedHeading = (_smoothedHeading + delta * 0.15 + 360) % 360;
+                }
+                userHeading = _smoothedHeading;
                 const el = document.getElementById('user-arrow');
-                if (el) { el.style.transform = `rotate(${h}deg)`; el.style.display = 'block'; }
+                if (el) el.style.display = 'block';
+                // Kick off rAF animation only if not already running
+                if (!_arrowRafId) _arrowRafId = requestAnimationFrame(_animateArrow);
             }
         }
 

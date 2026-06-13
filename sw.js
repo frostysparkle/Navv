@@ -1,5 +1,5 @@
 // ─── CACHE VERSIONING ────────────────────────────────────────────────────────
-const CACHE_NAME = 'navv-cache-v1';
+const CACHE_NAME = 'navv-cache-v2';
 const TILES_CACHE = 'navv-tiles-v1';
 
 // ─── CAMPUS BOUNDING BOX ─────────────────────────────────────────────────────

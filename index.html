@@ -224,6 +224,39 @@
         }
         .loading-title { font-size: 24px; font-weight: 800; color: var(--primary); margin-top: 16px; margin-bottom: 8px; }
         .loading-subtitle { font-size: 14px; font-weight: 500; color: var(--text-muted); }
+
+        /* ── PWA Install Banner ──────────────────────────────────────────────── */
+        #install-banner {
+            position: fixed; bottom: calc(var(--safe-bottom) + 88px); left: 50%;
+            transform: translateX(-50%) translateY(120%);
+            width: 92%; max-width: 440px;
+            z-index: 3000;
+            border-radius: 28px;
+            padding: 20px 24px;
+            box-sizing: border-box;
+            display: flex; align-items: center; gap: 16px;
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #install-banner.visible {
+            transform: translateX(-50%) translateY(0);
+        }
+        .install-banner-icon {
+            width: 52px; height: 52px; border-radius: 14px;
+            background: var(--primary); display: flex; align-items: center; justify-content: center;
+            font-size: 26px; flex-shrink: 0;
+        }
+        .install-banner-text { flex: 1; min-width: 0; }
+        .install-banner-text strong { display: block; font-size: 15px; font-weight: 700; }
+        .install-banner-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+        .install-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .install-banner-actions button {
+            border: none; border-radius: 12px; padding: 10px 16px;
+            font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .install-banner-actions button:active { opacity: 0.7; }
+        .install-accept-btn { background: var(--primary); color: #fff; }
+        .install-dismiss-btn { background: rgba(128,128,128,0.15); color: var(--text-muted); }
     </style>
 </head>
 <body class="light-theme">
@@ -251,6 +284,19 @@
                 <div id="nav-distance" style="font-size:11px; color:var(--text-muted); font-weight:700; text-transform:uppercase;">...</div>
                 <div id="nav-instruction" style="font-size:17px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">...</div>
             </div>
+        </div>
+    </div>
+
+    <!-- PWA Install Banner -->
+    <div id="install-banner" class="glass">
+        <div class="install-banner-icon">🧭</div>
+        <div class="install-banner-text">
+            <strong>Install Navv</strong>
+            <span>Get offline campus navigation on your home screen</span>
+        </div>
+        <div class="install-banner-actions">
+            <button id="install-accept-btn" class="install-accept-btn" aria-label="Install app">Install</button>
+            <button id="install-dismiss-btn" class="install-dismiss-btn" aria-label="Dismiss">✕</button>
         </div>
     </div>
 
@@ -520,10 +566,31 @@ out geom;`;
                 }
             });
 
-            // ── Filter buildings to campus polygon only ──────────────────────
+            // ── Filter buildings AND graph nodes to campus polygon only ───────
             if (data.boundary && data.boundary.coordinates && data.boundary.coordinates[0]) {
                 const poly = data.boundary.coordinates[0]; // array of [lon, lat]
+
+                // Filter buildings
                 data.buildings = data.buildings.filter(b => pointInPolygon(b.lat, b.lon, poly));
+
+                // Filter graph nodes — remove any node whose coordinates fall outside the campus
+                // boundary polygon. We allow a tiny 0.0003° (~30m) inward shrink so the buffer
+                // zone used for the visual mask is never part of the routable graph.
+                const removedNodeIds = new Set();
+                for (const [nid, coords] of Object.entries(data.graph.nodes)) {
+                    // coords = [lon, lat]
+                    if (!pointInPolygon(coords[1], coords[0], poly)) {
+                        removedNodeIds.add(nid);
+                        delete data.graph.nodes[nid];
+                    }
+                }
+                // Prune edges that reference removed nodes
+                if (removedNodeIds.size > 0) {
+                    for (const nid of removedNodeIds) delete data.graph.edges[nid];
+                    for (const nid of Object.keys(data.graph.edges)) {
+                        for (const rid of removedNodeIds) delete data.graph.edges[nid][rid];
+                    }
+                }
             }
 
             // Virtual nodes and connections
@@ -865,22 +932,73 @@ out geom;`;
                 if (userLocation) map.flyTo(userLocation, 17);
             };
 
-            // PWA Install Logic (Polite)
+            // ── PWA Install Logic ─────────────────────────────────────────────
             const installBtn = document.getElementById('install-btn-subtle');
-            let deferredPrompt;
+            const installBanner = document.getElementById('install-banner');
+            const installAcceptBtn = document.getElementById('install-accept-btn');
+            const installDismissBtn = document.getElementById('install-dismiss-btn');
+            let deferredPrompt = null;
+            let bannerShown = false;
+
+            const INSTALL_DISMISSED_KEY = 'navv_install_dismissed';
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
+            function showInstallBanner() {
+                if (bannerShown || isStandalone || localStorage.getItem(INSTALL_DISMISSED_KEY)) return;
+                bannerShown = true;
+                installBanner.classList.add('visible');
+            }
+
+            function hideInstallBanner() {
+                installBanner.classList.remove('visible');
+            }
+
             window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault(); deferredPrompt = e;
+                e.preventDefault();
+                deferredPrompt = e;
                 installBtn.style.display = 'flex';
+                // Show the banner after 3 seconds (polite delay)
+                setTimeout(showInstallBanner, 3000);
             });
+
+            installAcceptBtn.onclick = async () => {
+                hideInstallBanner();
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        installBtn.style.display = 'none';
+                        localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+                    }
+                    deferredPrompt = null;
+                } else {
+                    showToast("Tap Share → Add to Home Screen");
+                }
+            };
+
+            installDismissBtn.onclick = () => {
+                hideInstallBanner();
+                localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+            };
+
+            // Subtle icon button also triggers the prompt
             installBtn.onclick = async () => {
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
                     const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') installBtn.style.display = 'none';
+                    if (outcome === 'accepted') {
+                        installBtn.style.display = 'none';
+                        localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+                    }
                     deferredPrompt = null;
-                } else showToast("Tap Share -> Add to Home Screen");
+                } else showToast("Tap Share → Add to Home Screen");
             };
-            if (/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase()) && !navigator.standalone) installBtn.style.display = 'flex';
+
+            // iOS: no beforeinstallprompt — show banner manually
+            if (/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase()) && !navigator.standalone) {
+                installBtn.style.display = 'flex';
+                setTimeout(showInstallBanner, 3000);
+            }
         }
 
 

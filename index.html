@@ -227,30 +227,45 @@
 
         /* ── PWA Install Banner ──────────────────────────────────────────────── */
         #install-banner {
-            position: fixed; bottom: calc(var(--safe-bottom) + 88px); left: 50%;
-            transform: translateX(-50%) translateY(120%);
+            /* Anchored to the top, slides in downward — never touches search bar or route card */
+            position: fixed;
+            top: calc(var(--safe-top) + 8px);
+            left: 50%;
+            transform: translateX(-50%) translateY(calc(-100% - 24px));
             width: 92%; max-width: 440px;
-            z-index: 3000;
-            border-radius: 28px;
-            padding: 20px 24px;
+            z-index: 1200; /* Below search overlay (1000+), above map */
+            border-radius: 20px;
+            padding: 14px 16px;
             box-sizing: border-box;
-            display: flex; align-items: center; gap: 16px;
-            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex; align-items: center; gap: 12px;
+            transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+                        opacity 0.35s ease;
+            opacity: 0;
+            pointer-events: none;
         }
         #install-banner.visible {
             transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        /* Hide banner when search keyboard is active or a route card is open */
+        body.search-active #install-banner,
+        body.routing-active #install-banner {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-50%) translateY(calc(-100% - 24px));
         }
         .install-banner-icon {
-            width: 52px; height: 52px; border-radius: 14px;
+            width: 40px; height: 40px; border-radius: 11px;
             background: var(--primary); display: flex; align-items: center; justify-content: center;
-            font-size: 26px; flex-shrink: 0;
+            font-size: 20px; flex-shrink: 0;
         }
         .install-banner-text { flex: 1; min-width: 0; }
-        .install-banner-text strong { display: block; font-size: 15px; font-weight: 700; }
-        .install-banner-text span { font-size: 12px; color: var(--text-muted); font-weight: 500; }
-        .install-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .install-banner-text strong { display: block; font-size: 14px; font-weight: 700; }
+        .install-banner-text span { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+        .install-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
         .install-banner-actions button {
-            border: none; border-radius: 12px; padding: 10px 16px;
+            border: none; border-radius: 10px; padding: 8px 14px;
             font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
             transition: opacity 0.2s;
         }
@@ -287,12 +302,13 @@
         </div>
     </div>
 
-    <!-- PWA Install Banner -->
+    <!-- PWA Install Banner: top-anchored, slides DOWN — never overlaps search bar or route card -->
+
     <div id="install-banner" class="glass">
         <div class="install-banner-icon">🧭</div>
         <div class="install-banner-text">
             <strong>Install Navv</strong>
-            <span>Get offline campus navigation on your home screen</span>
+            <span>Add to home screen for offline navigation</span>
         </div>
         <div class="install-banner-actions">
             <button id="install-accept-btn" class="install-accept-btn" aria-label="Install app">Install</button>

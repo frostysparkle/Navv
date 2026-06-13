@@ -100,3 +100,12 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
     *   Tracks a **cumulative unwrapped `_displayAngle`** so the arrow never resets across the 0°/360° wrap boundary.
     *   Eases at 15% per frame (~200 ms settle at 60 fps) for smooth visuals, and **cancels itself** once within 0.5° of the target to avoid wasting CPU when stationary.
 
+---
+
+### Phase 9: Install Banner UI/UX Fix
+
+*   **Root Cause — Bottom collision:** The PWA install banner was anchored at `bottom: calc(var(--safe-bottom) + 88px)` with `z-index: 3000`, causing it to visually overlap the search bar, search results dropdown, and the route card bottom sheet simultaneously. There was no awareness of `search-active` or `routing-active` states.
+*   **Fix — Top-anchored slide-in:** Repositioned the banner to the top of the screen (`top: calc(var(--safe-top) + 8px)`), where it slides down from above using a `transform + opacity` animation. This placement is completely independent of all bottom-anchored UI elements.
+*   **State-aware auto-hide:** Added CSS rules for `body.search-active #install-banner` and `body.routing-active #install-banner` that immediately hide the banner (opacity 0, pointer-events none) whenever the search keyboard is active or the route card is open, preventing any visual interference.
+*   **Z-index cleanup:** Reduced from `3000` → `1200`, correctly placing the banner above the map and below the search overlay/route card in the stacking context.
+*   **Visual polish:** Reduced padding and icon size for a more compact, non-intrusive pill style appropriate to a top notification.

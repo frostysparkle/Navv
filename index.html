@@ -467,6 +467,117 @@
         let isCalculatingRoute = false;
         let blueDotIcon; // Assigned inside initMap() once Leaflet (L) is confirmed loaded
 
+        // ── PWA Install: capture beforeinstallprompt IMMEDIATELY (fires early, before initMap) ──
+        let deferredPrompt = null;
+        const _isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+        const _isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // If the install UI is already set up, show the banner now
+            if (window._installBannerReady) window._showInstallBanner();
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            const btn = document.getElementById('install-btn-subtle');
+            if (btn) btn.style.display = 'none';
+            const banner = document.getElementById('install-banner');
+            if (banner) banner.classList.remove('visible');
+            if (typeof showToast === 'function') showToast('Navv installed! ✅');
+        });
+
+        // Called from DOMContentLoaded — wires up all install UI interactions
+        function setupInstallPrompt() {
+            if (_isStandalone) {
+                const btn = document.getElementById('install-btn-subtle');
+                if (btn) btn.style.display = 'none';
+                return;
+            }
+
+            const installBtn    = document.getElementById('install-btn-subtle');
+            const installBanner = document.getElementById('install-banner');
+            const installAcceptBtn  = document.getElementById('install-accept-btn');
+            const installDismissBtn = document.getElementById('install-dismiss-btn');
+            const installModalOverlay = document.getElementById('install-modal-overlay');
+            const installModalCloseBtn = document.getElementById('install-modal-close-btn');
+            let bannerShown = false;
+
+            function showInstallModal() {
+                if (_isIOS) {
+                    document.getElementById('install-steps-ios').style.display = 'block';
+                } else if (/android/i.test(navigator.userAgent)) {
+                    document.getElementById('install-steps-android').style.display = 'block';
+                } else {
+                    document.getElementById('install-steps-generic').style.display = 'block';
+                }
+                installModalOverlay.classList.add('visible');
+            }
+
+            function hideInstallModal() {
+                installModalOverlay.classList.remove('visible');
+                ['install-steps-ios','install-steps-android','install-steps-generic'].forEach(id => {
+                    document.getElementById(id).style.display = 'none';
+                });
+            }
+
+            function showInstallBanner() {
+                if (bannerShown || _isStandalone) return;
+                bannerShown = true;
+                installBanner.classList.add('visible');
+            }
+
+            function hideInstallBanner() {
+                installBanner.classList.remove('visible');
+                bannerShown = false;
+            }
+
+            // Expose so the early beforeinstallprompt handler can trigger the banner
+            window._showInstallBanner = () => setTimeout(showInstallBanner, 2000);
+            window._installBannerReady = true;
+
+            // If beforeinstallprompt already fired before we got here, show banner now
+            if (deferredPrompt) setTimeout(showInstallBanner, 2000);
+
+            // iOS: show banner manually after a delay
+            if (_isIOS && !_isStandalone) setTimeout(showInstallBanner, 2000);
+
+            installModalOverlay.addEventListener('click', (e) => {
+                if (e.target === installModalOverlay) hideInstallModal();
+            });
+            installModalCloseBtn.onclick = hideInstallModal;
+
+            installAcceptBtn.onclick = async () => {
+                hideInstallBanner();
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                    if (outcome === 'accepted') showToast('Navv installed! ✅');
+                } else {
+                    showInstallModal();
+                }
+            };
+
+            installDismissBtn.onclick = () => hideInstallBanner();
+
+            // Install button in search bar
+            installBtn.onclick = async () => {
+                if (deferredPrompt) {
+                    hideInstallBanner();
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                    if (outcome === 'accepted') showToast('Navv installed! ✅');
+                } else {
+                    showInstallModal();
+                }
+            };
+        }
+
+        document.addEventListener('DOMContentLoaded', setupInstallPrompt);
+
         // --- THEME LOGIC ---
         function applyTheme(theme) {
             const body = document.body;
@@ -781,7 +892,7 @@ out geom;`;
                             if (loadingText) loadingText.innerHTML = `
                                 <span style="color:var(--danger)">Failed to load map data.</span><br>
                                 <span style="font-size:0.85em;opacity:0.8">The map server may be busy (429). Please wait a moment and try again.</span><br><br>
-                                <button onclick="location.reload()" style="padding:10px 24px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:1em;cursor:pointer;font-weight:600;">↺ Retry</button>
+                                <button onclick="location.reload()" style="padding:10px 24px;border-radius:12px;border:none;background:var(--primary);color:#fff;font-size:1em;cursor:pointer;font-weight:600;">↺ Retry</button>
                             `;
                             const spinner = document.querySelector('.spinning');
                             if (spinner) spinner.style.display = 'none';
@@ -1051,106 +1162,6 @@ out geom;`;
                 if (userLocation) map.flyTo(userLocation, 17);
             };
 
-            // ── PWA Install Logic ─────────────────────────────────────────────
-            const installBtn = document.getElementById('install-btn-subtle');
-            const installBanner = document.getElementById('install-banner');
-            const installAcceptBtn = document.getElementById('install-accept-btn');
-            const installDismissBtn = document.getElementById('install-dismiss-btn');
-            const installModalOverlay = document.getElementById('install-modal-overlay');
-            const installModalCloseBtn = document.getElementById('install-modal-close-btn');
-            let deferredPrompt = null;
-            let bannerShown = false;
-
-            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-            const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
-
-            // Show the correct install steps based on platform
-            function showInstallModal() {
-                if (isIOS) {
-                    document.getElementById('install-steps-ios').style.display = 'block';
-                } else if (/android/i.test(navigator.userAgent)) {
-                    document.getElementById('install-steps-android').style.display = 'block';
-                } else {
-                    document.getElementById('install-steps-generic').style.display = 'block';
-                }
-                installModalOverlay.classList.add('visible');
-            }
-
-            function hideInstallModal() {
-                installModalOverlay.classList.remove('visible');
-                // Hide all step sections for next open
-                ['install-steps-ios','install-steps-android','install-steps-generic'].forEach(id => {
-                    document.getElementById(id).style.display = 'none';
-                });
-            }
-
-            installModalOverlay.addEventListener('click', (e) => {
-                if (e.target === installModalOverlay) hideInstallModal();
-            });
-            installModalCloseBtn.onclick = hideInstallModal;
-
-            function showInstallBanner() {
-                if (bannerShown || isStandalone) return;
-                bannerShown = true;
-                installBanner.classList.add('visible');
-            }
-
-            function hideInstallBanner() {
-                installBanner.classList.remove('visible');
-                bannerShown = false;
-            }
-
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                // Show the banner after 3 seconds (polite delay)
-                setTimeout(showInstallBanner, 3000);
-            });
-
-            installAcceptBtn.onclick = async () => {
-                hideInstallBanner();
-                if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    deferredPrompt = null;
-                } else {
-                    showInstallModal();
-                }
-            };
-
-            installDismissBtn.onclick = () => {
-                hideInstallBanner();
-            };
-
-            // Install icon button in search bar: triggers prompt or shows guide
-            installBtn.onclick = async () => {
-                if (deferredPrompt) {
-                    hideInstallBanner();
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    deferredPrompt = null;
-                    if (outcome === 'accepted') showToast('Navv installed! ✅');
-                } else {
-                    showInstallModal();
-                }
-            };
-
-            // iOS: no beforeinstallprompt — show banner after a delay
-            if (isIOS && !isStandalone) {
-                setTimeout(showInstallBanner, 3000);
-            }
-
-            // Hide the install button once the app is installed
-            window.addEventListener('appinstalled', () => {
-                installBtn.style.display = 'none';
-                hideInstallBanner();
-                showToast('Navv installed! ✅');
-            });
-
-            // Always hide install button when running in standalone mode
-            if (isStandalone) {
-                installBtn.style.display = 'none';
-            }
         }
 
 
@@ -1210,25 +1221,28 @@ out geom;`;
             const start = () => navigator.geolocation.watchPosition(handlePos, (e) => { if (e.code !== 3) showToast("GPS error: " + e.message); }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 });
             watchId = start();
             setTimeout(() => { if (!userLocation) showToast("Enable location for directions"); }, 10000);
-            let orientListening = false; // Guard: prevent duplicate listeners on repeated GPS button taps
-            gpsBtn.onclick = () => { 
-                isFollowing = true; updateGPSUI(); 
+
+            let orientListening = false; // Guard: prevent duplicate listeners
+
+            // Android/Desktop: start compass immediately — no permission needed
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission !== 'function') {
+                orientListening = true;
+                window.addEventListener('deviceorientationabsolute', onOrient, true);
+                window.addEventListener('deviceorientation', onOrient, true);
+            }
+
+            gpsBtn.onclick = () => {
+                isFollowing = true; updateGPSUI();
                 if (userLocation) map.flyTo(userLocation, 18);
-                if (!orientListening) {
+                // iOS only: requestPermission requires a user gesture
+                if (!orientListening && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     orientListening = true;
-                    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                        // iOS: request permission first
-                        DeviceOrientationEvent.requestPermission().then(s => {
-                            if (s === 'granted') {
-                                window.addEventListener('deviceorientationabsolute', onOrient, true);
-                                window.addEventListener('deviceorientation', onOrient, true);
-                            }
-                        });
-                    } else {
-                        // Android / Desktop: listen to both; absolute fires first and sets the flag
-                        window.addEventListener('deviceorientationabsolute', onOrient, true);
-                        window.addEventListener('deviceorientation', onOrient, true);
-                    }
+                    DeviceOrientationEvent.requestPermission().then(s => {
+                        if (s === 'granted') {
+                            window.addEventListener('deviceorientationabsolute', onOrient, true);
+                            window.addEventListener('deviceorientation', onOrient, true);
+                        }
+                    });
                 }
             };
         }

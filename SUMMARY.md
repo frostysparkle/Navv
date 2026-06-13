@@ -121,3 +121,20 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
     *   **Android (Chrome):** Open ⋮ menu → "Add to Home screen" → Confirm
     *   **Generic:** Fallback steps for other browsers
 *   **`appinstalled` Listener:** Added a `window.addEventListener('appinstalled', ...)` handler that hides the button and banner and shows a confirmation toast once the app is successfully installed, keeping the UI in sync with install state.
+
+---
+
+### Phase 11: Install Prompt Race-Fix, Compass Auto-Start & CSS Variable Bug
+
+#### Fix 1 — `beforeinstallprompt` Race Condition (Android install button showed guide instead of native prompt)
+*   **Root Cause:** The `beforeinstallprompt` event fires very early in page load — often before `DOMContentLoaded` and always before `initMap()` is called (which waits for Overpass API data). The listener was inside `initMap()`, so it consistently missed the event, leaving `deferredPrompt = null`. The install button always fell through to the instructions modal instead of triggering Chrome's native install dialog.
+*   **Fix:** Moved `beforeinstallprompt` and `appinstalled` listeners to the **very top of the `<script>` block** at global scope. A dedicated `setupInstallPrompt()` wired to `DOMContentLoaded` handles all UI bindings. A `window._installBannerReady` + `window._showInstallBanner()` bridge handles the case where the event fires before or after setup completes.
+
+#### Fix 2 — Compass Arrow Not Shown Until GPS Button Tap (Android)
+*   **Root Cause:** `deviceorientation` listeners were only attached inside `gpsBtn.onclick`. On Android, no permission is required — the sensor fires automatically — but since listeners weren't registered until the button was tapped, the direction arrow was invisible on first load.
+*   **Fix:** For Android/Desktop (no `requestPermission` API), listeners are now registered **immediately inside `setupGeolocation()`**. iOS path (which requires a user gesture for `requestPermission()`) remains inside `gpsBtn.onclick`.
+
+#### Fix 3 — `var(--accent)` Undefined CSS Variable on Retry Button
+*   **Root Cause:** The Overpass-failure error screen's "↺ Retry" button used `var(--accent)`, which was never declared in `:root`. The button rendered with no background colour.
+*   **Fix:** Replaced `var(--accent)` with the correctly defined `var(--primary)` (`#4F46E5`).
+

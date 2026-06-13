@@ -109,3 +109,15 @@ An offline-first, high-performance, mobile-optimized Progressive Web Application
 *   **State-aware auto-hide:** Added CSS rules for `body.search-active #install-banner` and `body.routing-active #install-banner` that immediately hide the banner (opacity 0, pointer-events none) whenever the search keyboard is active or the route card is open, preventing any visual interference.
 *   **Z-index cleanup:** Reduced from `3000` → `1200`, correctly placing the banner above the map and below the search overlay/route card in the stacking context.
 *   **Visual polish:** Reduced padding and icon size for a more compact, non-intrusive pill style appropriate to a top notification.
+
+---
+
+### Phase 10: Install Button & Guide Modal Overhaul
+
+*   **Always-Visible Install Button:** The `#install-btn-subtle` download icon in the search bar was previously hidden (`display:none`) and only appeared if the browser fired a `beforeinstallprompt` event. This event is suppressed once the app is installed or after prior dismissal, so the button effectively disappeared permanently. **Fix:** Removed the `display:none` default; the button is always visible and only hides itself when running in standalone (installed) mode.
+*   **Permanent Dismiss Bug:** Clicking ✕ on the install banner previously wrote `navv_install_dismissed` to `localStorage`, blocking both the banner and the button from ever appearing again, even across sessions. **Fix:** Removed the permanent-dismiss key entirely. The banner now only hides temporarily and can re-appear on the next session if the browser fires `beforeinstallprompt` again.
+*   **Install Guide Modal:** When the native browser install prompt is unavailable (already installed, Firefox, or after Chrome's internal suppression), tapping the install button previously showed only a one-line toast — insufficient for users who didn't know the browser-native flow. **Fix:** Added a full bottom-sheet modal (`#install-modal-overlay`) with animated slide-up, glassmorphism styling, and **platform-aware step-by-step instructions**:
+    *   **iOS (Safari):** Tap Share → Scroll & tap "Add to Home Screen" → Tap "Add"
+    *   **Android (Chrome):** Open ⋮ menu → "Add to Home screen" → Confirm
+    *   **Generic:** Fallback steps for other browsers
+*   **`appinstalled` Listener:** Added a `window.addEventListener('appinstalled', ...)` handler that hides the button and banner and shows a confirmation toast once the app is successfully installed, keeping the UI in sync with install state.

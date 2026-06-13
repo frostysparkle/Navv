@@ -19,7 +19,7 @@
 *   🔁 **Resilient Error Recovery:** When the map data server is temporarily unavailable (rate-limited), the app shows a clear explanation and a one-tap **Retry** button instead of a dead screen.
 *   🏛️ **Campus-Only Search:** Buildings are filtered through the exact OSM campus polygon at data-processing time. Nothing outside the boundary ever appears in search results.
 *   🏷️ **Clean POI Labels:** All raw OSM tags (`yes`, `student_accommodation`, etc.) are mapped to human-readable labels like `Building`, `Student Accommodation`, `Café`, etc.
-*   📲 **Non-Intrusive Install Prompt:** The PWA install banner slides in from the top of the screen and automatically hides whenever the search keyboard or route card is active, ensuring it never interferes with navigation.
+*   📲 **Smart Install System:** The download button is always visible in the search bar. Tapping it triggers the native browser install prompt when available, or slides up a platform-aware step-by-step install guide (iOS / Android / Desktop). The install banner auto-hides during navigation and search to never interfere with wayfinding.
 
 ---
 
